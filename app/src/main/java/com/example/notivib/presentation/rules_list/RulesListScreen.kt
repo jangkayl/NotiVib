@@ -402,24 +402,27 @@ fun RulesListScreen(
 @Composable
 fun RadarStatusIndicator(isActive: Boolean) {
     val infiniteTransition = rememberInfiniteTransition(label = "radar")
-    val scale by infiniteTransition.animateFloat(
+    val scaleAnim by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (isActive) 1.5f else 1f,
-        animationSpec = if (isActive) InfiniteRepeatableSpec(
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(
             animation = tween(1500),
             repeatMode = RepeatMode.Restart
-        ) else InfiniteRepeatableSpec(animation = tween(0)),
+        ),
         label = "radar_scale"
     )
-    val alpha by infiniteTransition.animateFloat(
+    val alphaAnim by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (isActive) 0f else 1f,
-        animationSpec = if (isActive) InfiniteRepeatableSpec(
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
             animation = tween(1500),
             repeatMode = RepeatMode.Restart
-        ) else InfiniteRepeatableSpec(animation = tween(0)),
+        ),
         label = "radar_alpha"
     )
+
+    val currentScale = if (isActive) scaleAnim else 1f
+    val currentAlpha = if (isActive) alphaAnim else 0f
 
     Box(
         modifier = Modifier
@@ -430,8 +433,8 @@ fun RadarStatusIndicator(isActive: Boolean) {
         Box(
             modifier = Modifier
                 .size(80.dp)
-                .scale(scale)
-                .background(if (isActive) ElectricBlue.copy(alpha = alpha) else Color.Gray.copy(alpha = 0.3f), CircleShape)
+                .scale(currentScale)
+                .background(if (isActive) ElectricBlue.copy(alpha = currentAlpha) else Color.Gray.copy(alpha = 0.3f), CircleShape)
         )
         Box(
             modifier = Modifier
