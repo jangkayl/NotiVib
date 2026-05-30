@@ -52,7 +52,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
             context.logsDataStore.edit { prefs ->
                 val current = parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]").toMutableList()
                 current.add(0, log)
-                if (current.size > 200) current.removeLast()
+                if (current.size > 50) current.removeLast()
                 prefs[SYSTEM_LOGS_KEY] = serializeSystemLogs(current)
             }
         }
@@ -82,7 +82,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
             context.logsDataStore.edit { prefs ->
                 val current = parseInterceptLogs(prefs[INTERCEPT_LOGS_KEY] ?: "[]").toMutableList()
                 current.add(0, log)
-                if (current.size > 200) current.removeLast()
+                if (current.size > 80) current.removeLast()
                 prefs[INTERCEPT_LOGS_KEY] = serializeInterceptLogs(current)
             }
         }

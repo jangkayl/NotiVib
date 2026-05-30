@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -602,4 +603,43 @@ fun AddRuleDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RadarStatusIndicatorPreview() {
+    MaterialTheme {
+        RadarStatusIndicator(isActive = true)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RuleCardPreview() {
+    MaterialTheme {
+        RuleCard(
+            rule = AlarmRule(
+                id = "1",
+                targetPackage = "Messenger",
+                keyword = "Emergency",
+                startTimeMinute = 480,
+                endTimeMinute = 1200,
+                vibrationOnly = false
+            ),
+            onDelete = {},
+            onEdit = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AddRuleDialogPreview() {
+    MaterialTheme {
+        AddRuleDialog(
+            editingRule = null,
+            onDismiss = {},
+            onSave = { _, _, _, _, _, _ -> }
+        )
+    }
 }
