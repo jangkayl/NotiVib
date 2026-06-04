@@ -8,12 +8,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.style.TextAlign
 import com.example.notivib.framework.service.ActiveAlarmService
 
 class AlarmActivity : ComponentActivity() {
@@ -52,26 +62,93 @@ class AlarmActivity : ComponentActivity() {
 
 @Composable
 fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+
     MaterialTheme {
-        Column(
-            modifier = Modifier.fillMaxSize().background(Color(0xFF1E0A0A)).padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("ALARM TRIGGERED!", color = Color.Red, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(32.dp))
-            Text("Matched App:", color = Color.Gray)
-            Text(appName, color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(16.dp))
-            Text("Matched Rule:", color = Color.Gray)
-            Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(64.dp))
-            Button(
-                onClick = onAcknowledge,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                modifier = Modifier.fillMaxWidth().height(64.dp)
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF151414))) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0xFFE56E6E).copy(alpha = pulseAlpha), Color.Transparent),
+                            radius = 1200f
+                        )
+                    )
+            )
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("ACKNOWLEDGE", fontWeight = FontWeight.Bold)
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFE56E6E),
+                    modifier = Modifier.size(80.dp)
+                )
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "INTERCEPTION ALERT", 
+                    color = Color.White, 
+                    style = MaterialTheme.typography.headlineLarge, 
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 2.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "A critical notification has matched your rules.", 
+                    color = Color.Gray, 
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(Modifier.height(48.dp))
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF231414)),
+                    border = BorderStroke(1.dp, Color(0xFFE56E6E).copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("TARGET APPLICATION", style = MaterialTheme.typography.labelMedium, color = Color(0xFFE56E6E), fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(appName, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        
+                        Spacer(Modifier.height(24.dp))
+                        HorizontalDivider(color = Color(0xFFE56E6E).copy(alpha = 0.1f))
+                        Spacer(Modifier.height(24.dp))
+                        
+                        Text("MATCHED KEYWORD", style = MaterialTheme.typography.labelMedium, color = Color(0xFFE56E6E), fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                
+                Spacer(Modifier.height(64.dp))
+                
+                Button(
+                    onClick = onAcknowledge,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE56E6E)),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                ) {
+                    Text("ACKNOWLEDGE & DISMISS", fontWeight = FontWeight.ExtraBold, color = Color.White, letterSpacing = 1.sp)
+                }
             }
         }
     }

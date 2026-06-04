@@ -16,13 +16,19 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,13 +38,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.notivib.domain.model.AlarmRule
-import com.example.notivib.presentation.theme.ElectricBlue
 import com.example.notivib.framework.service.InterceptorService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,9 +60,21 @@ fun checkNotificationAccess(context: Context): Boolean {
     }
 }
 
+fun formatTime(minutes: Int): String {
+    return String.format("%02d:%02d", minutes / 60, minutes % 60)
+}
+
 data class AppInfo(val name: String, val packageName: String)
 
+object AppListCache {
+    var cachedApps: List<AppInfo>? = null
+}
+
 suspend fun getInstalledApps(context: Context): List<AppInfo> = withContext(Dispatchers.IO) {
+    if (AppListCache.cachedApps != null) {
+        return@withContext AppListCache.cachedApps!!
+    }
+
     try {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN, null).apply {
@@ -68,13 +87,16 @@ suspend fun getInstalledApps(context: Context): List<AppInfo> = withContext(Disp
             pm.queryIntentActivities(intent, 0)
         }
         
-        resolveInfoList.mapNotNull { resolveInfo ->
+        val apps = resolveInfoList.mapNotNull { resolveInfo ->
             val appName = resolveInfo.loadLabel(pm).toString()
             val packageName = resolveInfo.activityInfo.packageName
             if (!appName.startsWith("com.") && !appName.startsWith("android.") && !appName.startsWith("org.")) {
                 AppInfo(appName, packageName)
             } else null
         }.distinctBy { it.packageName }.sortedBy { it.name.lowercase() }
+        
+        AppListCache.cachedApps = apps
+        apps
     } catch (e: Exception) {
         emptyList()
     }
@@ -83,14 +105,14 @@ suspend fun getInstalledApps(context: Context): List<AppInfo> = withContext(Disp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RulesListScreen(
-    viewModel: RulesListViewModel = hiltViewModel()
+    viewModel: RulesListViewModel = hiltViewModel(),
+    onNavigateToLogs: () -> Unit = {}
 ) {
     val rules by viewModel.rules.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val systemLogs by viewModel.systemLogs.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingRule by remember { mutableStateOf<AlarmRule?>(null) }
-    var showLogDialog by remember { mutableStateOf(false) }
     var showSystemLogsDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     
@@ -139,35 +161,45 @@ fun RulesListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("NotiVib Radar", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("NotiVib", fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.primary
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
                     IconButton(onClick = { showSystemLogsDialog = true }) {
-                        Icon(Icons.Default.Info, contentDescription = "System Status Logs")
+                        Icon(Icons.Default.Info, contentDescription = "System Status Logs", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             )
         },
         floatingActionButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.End) {
                 FloatingActionButton(
-                    onClick = { showLogDialog = true },
-                    containerColor = MaterialTheme.colorScheme.secondary
+                    onClick = onNavigateToLogs,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Intercept Log")
                 }
-                FloatingActionButton(
+                ExtendedFloatingActionButton(
                     onClick = { 
                         editingRule = null
                         showAddDialog = true 
                     },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Rule")
-                }
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(20.dp),
+                    icon = { Icon(Icons.Default.Add, contentDescription = "Add Rule") },
+                    text = { Text("New Rule", fontWeight = FontWeight.Bold) }
+                )
             }
         }
     ) { padding ->
@@ -177,50 +209,25 @@ fun RulesListScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            RadarStatusIndicator(isActive = hasNotificationAccess && isServiceEnabled)
-
-            Card(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = if (isServiceEnabled) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            if (isServiceEnabled) "App Background Service is Enabled" else "App is Forcefully Stopped",
-                            fontWeight = FontWeight.Bold,
-                            color = if (isServiceEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onErrorContainer
+            EngineStatusCard(
+                isActive = hasNotificationAccess && isServiceEnabled,
+                onToggle = { enable ->
+                    isServiceEnabled = enable
+                    try {
+                        val state = if (enable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                        context.packageManager.setComponentEnabledSetting(
+                            ComponentName(context, InterceptorService::class.java),
+                            state,
+                            PackageManager.DONT_KILL_APP
                         )
-                        Text(
-                            "Toggle to permanently kill/revive the background listener process.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isServiceEnabled) Color.Gray else MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                    Switch(
-                        checked = isServiceEnabled,
-                        onCheckedChange = { enable ->
-                            isServiceEnabled = enable
-                            try {
-                                val state = if (enable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                                context.packageManager.setComponentEnabledSetting(
-                                    ComponentName(context, InterceptorService::class.java),
-                                    state,
-                                    PackageManager.DONT_KILL_APP
-                                )
-                                if (!enable) {
-                                    Toast.makeText(context, "App forcefully stopped. It will not run in the background.", Toast.LENGTH_LONG).show()
-                                }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+                        if (!enable) {
+                            Toast.makeText(context, "Engine suspended.", Toast.LENGTH_SHORT).show()
                         }
-                    )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-            }
+            )
 
             if (!permissionGrantedState && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Card(
@@ -300,154 +307,94 @@ fun RulesListScreen(
         }
 
         if (showSystemLogsDialog) {
-            AlertDialog(
-                onDismissRequest = { showSystemLogsDialog = false },
-                title = {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("System Logs")
-                        TextButton(onClick = { viewModel.clearSystemLogs() }) {
-                            Text("Clear All", color = Color.Red)
-                        }
-                    }
-                },
-                text = {
-                    if (systemLogs.isEmpty()) {
-                        Text("No system logs found.")
-                    } else {
-                        LazyColumn(modifier = Modifier.fillMaxWidth().height(400.dp)) {
-                            items(systemLogs) { log ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(log, style = MaterialTheme.typography.bodySmall, color = Color.LightGray, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { viewModel.deleteSystemLog(log) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete Log", tint = Color.Gray, modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                                HorizontalDivider(color = Color.DarkGray)
+            Dialog(onDismissRequest = { showSystemLogsDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp).heightIn(max = 600.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Engine Diagnostics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            TextButton(onClick = { viewModel.clearSystemLogs() }) {
+                                Text("Clear All", color = MaterialTheme.colorScheme.error)
                             }
                         }
-                    }
-                },
-                confirmButton = { TextButton(onClick = { showSystemLogsDialog = false }) { Text("Close") } }
-            )
-        }
-
-        if (showLogDialog) {
-            var expandedLogId by remember { mutableStateOf<String?>(null) }
-            AlertDialog(
-                onDismissRequest = { showLogDialog = false },
-                title = { 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Interceptions")
-                        TextButton(onClick = { viewModel.clearInterceptLogs() }) {
-                            Text("Clear All", color = Color.Red)
-                        }
-                    }
-                },
-                text = {
-                    if (logs.isEmpty()) {
-                        Text("No notifications intercepted yet.")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth().height(400.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(logs) { log ->
-                                val logId = log.time + log.packageName
-                                val isExpanded = expandedLogId == logId
-                                
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().clickable {
-                                        expandedLogId = if (isExpanded) null else logId
-                                    },
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (log.matchedRule != null) Color(0xFF1E3A1E) else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                ) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Column(modifier = Modifier.padding(8.dp).weight(1f).animateContentSize()) {
-                                            Text("${log.time} - ${log.appName}", fontWeight = FontWeight.Bold)
-                                            Text("Package: ${log.packageName}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                                            Text("Title: ${log.title}", style = MaterialTheme.typography.bodySmall)
-                                            
-                                            if (isExpanded) {
-                                                Text("Content: ${log.text}", style = MaterialTheme.typography.bodySmall)
-                                            } else {
-                                                Text("Content: ${log.text}", style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                                            }
-                                            
-                                            if (log.matchedRule != null) {
-                                                Text("ALARM TRIGGERED: ${log.matchedRule}", color = Color.Green, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
-                                            }
-                                        }
-                                        IconButton(onClick = { viewModel.deleteInterceptLog(log) }) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray)
+                        Spacer(Modifier.height(16.dp))
+                        
+                        if (systemLogs.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                Text("All systems nominal.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                                items(systemLogs) { log ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(log, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                                        IconButton(onClick = { viewModel.deleteSystemLog(log) }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                         }
                                     }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                                 }
                             }
                         }
+                        
+                        Spacer(Modifier.height(24.dp))
+                        Button(onClick = { showSystemLogsDialog = false }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(50)) {
+                            Text("Dismiss", fontWeight = FontWeight.Bold)
+                        }
                     }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showLogDialog = false }) { Text("Close") }
                 }
-            )
+            }
         }
     }
 }
 
 @Composable
-fun RadarStatusIndicator(isActive: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "radar")
-    val scaleAnim by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "radar_scale"
-    )
-    val alphaAnim by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "radar_alpha"
-    )
-
-    val currentScale = if (isActive) scaleAnim else 1f
-    val currentAlpha = if (isActive) alphaAnim else 0f
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(150.dp),
-        contentAlignment = Alignment.Center
+fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
     ) {
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .scale(currentScale)
-                .background(if (isActive) ElectricBlue.copy(alpha = currentAlpha) else Color.Gray.copy(alpha = 0.3f), CircleShape)
-        )
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .background(MaterialTheme.colorScheme.surface, CircleShape),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = Icons.Default.NotificationsActive,
-                contentDescription = "Listening",
-                tint = if (isActive) MaterialTheme.colorScheme.primary else Color.Gray,
-                modifier = Modifier.size(40.dp)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier.size(12.dp).background(if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, CircleShape)
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text(
+                        if (isActive) "Engine Active" else "Engine Suspended",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        if (isActive) "Intercepting notifications" else "All rules are paused",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Switch(
+                checked = isActive,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                )
             )
         }
     }
@@ -455,38 +402,109 @@ fun RadarStatusIndicator(isActive: Boolean) {
 
 @Composable
 fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule) -> Unit) {
+    val context = LocalContext.current
+    var friendlyAppName by remember(rule.targetPackage) { mutableStateOf(if (rule.targetPackage == "ANY") "All Applications" else rule.targetPackage) }
+
+    LaunchedEffect(rule.targetPackage) {
+        if (rule.targetPackage != "ANY") {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(rule.targetPackage, 0)
+                friendlyAppName = pm.getApplicationLabel(appInfo).toString()
+            } catch (e: Exception) {
+                // Keep the package name as fallback
+            }
+        }
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit(rule) },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("App: ${rule.targetPackage.ifEmpty { "Any" }}", fontWeight = FontWeight.Bold)
-                Text("Keywords: ${rule.keyword.ifEmpty { "Any" }}", color = Color.Gray)
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    if (rule.targetPackage == "ANY") {
+                        Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+                        }
+                    } else {
+                        AppIconImage(packageName = rule.targetPackage, modifier = Modifier.size(40.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = friendlyAppName,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                        if (rule.targetPackage != "ANY") {
+                            Text(
+                                text = rule.targetPackage,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Gray,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
                 
-                Text(
-                    "Mode: ${if (rule.vibrationOnly) "Vibrate Only" else "Alarm + Vibrate"}",
-                    color = if (rule.vibrationOnly) Color.Cyan else Color.Red,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                
-                if (rule.startTimeMinute == 0 && rule.endTimeMinute == 1440) {
-                    Text("Time: 24/7 Active", color = MaterialTheme.colorScheme.primary)
-                } else {
-                    Text(
-                        "Time: ${String.format("%02d:%02d", rule.startTimeMinute/60, rule.startTimeMinute%60)} - " +
-                        "${String.format("%02d:%02d", rule.endTimeMinute/60, rule.endTimeMinute%60)}",
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                Row {
+                    IconButton(onClick = { onEdit(rule) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = { onDelete(rule) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                    }
                 }
             }
-            IconButton(onClick = { onDelete(rule) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+            
+            Spacer(Modifier.height(20.dp))
+            
+            Text("MATCHING KEYWORDS", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = rule.keyword.replace(",", " • "),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+            Spacer(Modifier.height(16.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Schedule, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "${formatTime(rule.startTimeMinute)} - ${formatTime(rule.endTimeMinute)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.LightGray
+                    )
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (rule.vibrationOnly) Icons.Default.Vibration else Icons.Default.NotificationsActive, 
+                        contentDescription = null, 
+                        tint = if (rule.vibrationOnly) Color.Cyan.copy(alpha = 0.8f) else Color.Magenta.copy(alpha = 0.8f), 
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (rule.vibrationOnly) "Vibrate Only" else "Alarm & Vibrate",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (rule.vibrationOnly) Color.Cyan.copy(alpha = 0.8f) else Color.Magenta.copy(alpha = 0.8f)
+                    )
+                }
             }
         }
     }
@@ -495,121 +513,224 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddRuleDialog(
-    editingRule: AlarmRule?, 
-    onDismiss: () -> Unit, 
+    editingRule: AlarmRule?,
+    onDismiss: () -> Unit,
     onSave: (String?, String, String, Int, Int, Boolean) -> Unit
 ) {
-    var pkg by remember { mutableStateOf(editingRule?.targetPackage ?: "") }
-    var kw by remember { mutableStateOf(editingRule?.keyword ?: "") }
-    
-    val initial247 = editingRule == null || (editingRule.startTimeMinute == 0 && editingRule.endTimeMinute == 1440)
-    var is247 by remember { mutableStateOf(initial247) }
-    
-    var startHour by remember { mutableStateOf(if (editingRule != null) String.format("%02d", editingRule.startTimeMinute / 60) else "08") }
-    var startMin by remember { mutableStateOf(if (editingRule != null) String.format("%02d", editingRule.startTimeMinute % 60) else "00") }
-    var endHour by remember { mutableStateOf(if (editingRule != null) String.format("%02d", editingRule.endTimeMinute / 60) else "20") }
-    var endMin by remember { mutableStateOf(if (editingRule != null) String.format("%02d", editingRule.endTimeMinute % 60) else "00") }
-    
-    var vibrationOnly by remember { mutableStateOf(editingRule?.vibrationOnly ?: false) }
-    
-    var showAppPicker by remember { mutableStateOf(false) }
-    var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
     val context = LocalContext.current
+    var keyword by remember { mutableStateOf(editingRule?.keyword ?: "") }
+    var targetPackage by remember { mutableStateOf(editingRule?.targetPackage ?: "ANY") }
+    
+    var appName by remember { 
+        mutableStateOf(
+            if (editingRule == null || editingRule.targetPackage == "ANY") "ANY APP"
+            else {
+                try {
+                    val appInfo = context.packageManager.getApplicationInfo(editingRule.targetPackage, 0)
+                    context.packageManager.getApplicationLabel(appInfo).toString()
+                } catch (e: Exception) {
+                    editingRule.targetPackage
+                }
+            }
+        )
+    }
+    
+    var startTimeMinute by remember { mutableStateOf(editingRule?.startTimeMinute ?: 0) }
+    var endTimeMinute by remember { mutableStateOf(editingRule?.endTimeMinute ?: 1439) }
+    var vibrationOnly by remember { mutableStateOf(editingRule?.vibrationOnly ?: false) }
+
+    var expanded by remember { mutableStateOf(false) }
+    var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         installedApps = getInstalledApps(context)
     }
 
-    if (showAppPicker) {
-        AlertDialog(
-            onDismissRequest = { showAppPicker = false },
-            title = { Text("Select Installed App") },
-            text = {
-                LazyColumn(modifier = Modifier.fillMaxWidth().height(400.dp)) {
-                    items(installedApps) { app ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    pkg = app.name
-                                    showAppPicker = false
-                                }
-                                .padding(16.dp)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
+            shape = RoundedCornerShape(32.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp).verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = if (editingRule == null) "Create New Rule" else "Edit Rule",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Configure how the app intercepts and alerts you.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+                
+                Spacer(Modifier.height(28.dp))
+                
+                OutlinedTextField(
+                    value = keyword,
+                    onValueChange = { keyword = it },
+                    label = { Text("Trigger Keywords (Comma separated)") },
+                    placeholder = { Text("e.g. URGENT, Boss, Emergency") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
+                    ),
+                    singleLine = true
+                )
+                
+                Spacer(Modifier.height(16.dp))
+
+                Text("Target Application", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp))
+                Spacer(Modifier.height(4.dp))
+                OutlinedCard(
+                    onClick = { expanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+                    colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (targetPackage == "ANY") {
+                            Icon(Icons.Default.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("ALL APPLICATIONS", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        } else {
+                            AppIconImage(packageName = targetPackage, modifier = Modifier.size(32.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(appName, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(targetPackage, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            }
+                        }
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
+                    }
+                }
+                
+                if (expanded) {
+                    Dialog(onDismissRequest = { expanded = false }) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(8.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
-                            Text(app.name, fontWeight = FontWeight.Bold)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Select Target Application", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(16.dp))
+                                LazyColumn(modifier = Modifier.weight(1f)) {
+                                    item {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clickable {
+                                                targetPackage = "ANY"
+                                                appName = "ANY APP"
+                                                expanded = false
+                                            }.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                                            Spacer(Modifier.width(16.dp))
+                                            Text("ALL APPLICATIONS", fontWeight = FontWeight.ExtraBold)
+                                        }
+                                        HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                                    }
+                                    items(installedApps) { app ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clickable {
+                                                targetPackage = app.packageName
+                                                appName = app.name
+                                                expanded = false
+                                            }.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            AppIconImage(packageName = app.packageName, modifier = Modifier.size(32.dp))
+                                            Spacer(Modifier.width(16.dp))
+                                            Column {
+                                                Text(app.name, fontWeight = FontWeight.SemiBold)
+                                                Text(app.packageName, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                                Button(onClick = { expanded = false }, modifier = Modifier.fillMaxWidth()) {
+                                    Text("Cancel")
+                                }
+                            }
                         }
                     }
                 }
-            },
-            confirmButton = { TextButton(onClick = { showAppPicker = false }) { Text("Cancel") } }
-        )
-    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (editingRule != null) "Edit Rule" else "Add New Rule") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = pkg, 
-                        onValueChange = { pkg = it }, 
-                        label = { Text("App Name (e.g. Messenger)") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = { showAppPicker = true }) {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Pick App", tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(24.dp))
+                Text("Time Window", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(8.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Start Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Slider(
+                            value = startTimeMinute.toFloat(),
+                            onValueChange = { startTimeMinute = it.toInt() },
+                            valueRange = 0f..1439f,
+                            steps = 95
+                        )
+                        Text(formatTime(startTimeMinute), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("End Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Slider(
+                            value = endTimeMinute.toFloat(),
+                            onValueChange = { endTimeMinute = it.toInt() },
+                            valueRange = 0f..1439f,
+                            steps = 95
+                        )
+                        Text(formatTime(endTimeMinute), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { vibrationOnly = !vibrationOnly }.padding(vertical = 8.dp)) {
+                    Switch(checked = vibrationOnly, onCheckedChange = { vibrationOnly = it })
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text("Vibration Only Mode", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("If enabled, audio alarms will not play.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     }
                 }
                 
-                OutlinedTextField(
-                    value = kw, 
-                    onValueChange = { kw = it }, 
-                    label = { Text("Keywords (comma separated)") }
-                )
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = vibrationOnly, onCheckedChange = { vibrationOnly = it })
-                    Text("Vibrate Only (Silent)")
-                }
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = is247, onCheckedChange = { is247 = it })
-                    Text("24/7 Active")
-                }
-                
-                if (!is247) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(value = startHour, onValueChange = { startHour = it }, label = { Text("Start HH") }, modifier = Modifier.weight(1f))
-                        OutlinedTextField(value = startMin, onValueChange = { startMin = it }, label = { Text("Start MM") }, modifier = Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(value = endHour, onValueChange = { endHour = it }, label = { Text("End HH") }, modifier = Modifier.weight(1f))
-                        OutlinedTextField(value = endMin, onValueChange = { endMin = it }, label = { Text("End MM") }, modifier = Modifier.weight(1f))
+                Spacer(Modifier.height(32.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
+                    Spacer(Modifier.width(12.dp))
+                    Button(
+                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly) },
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                    ) { 
+                        Text("Save Rule", fontWeight = FontWeight.Bold) 
                     }
                 }
             }
-        },
-        confirmButton = {
-            Button(onClick = { 
-                val st = if (is247) 0 else (startHour.toIntOrNull() ?: 8) * 60 + (startMin.toIntOrNull() ?: 0)
-                val et = if (is247) 1440 else (endHour.toIntOrNull() ?: 20) * 60 + (endMin.toIntOrNull() ?: 0)
-                onSave(editingRule?.id, pkg.trim(), kw.trim(), st, et, vibrationOnly) 
-            }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun RadarStatusIndicatorPreview() {
+fun EngineStatusCardPreview() {
     MaterialTheme {
-        RadarStatusIndicator(isActive = true)
+        EngineStatusCard(isActive = true, onToggle = {})
     }
 }
 

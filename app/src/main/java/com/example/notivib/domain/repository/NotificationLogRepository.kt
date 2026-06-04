@@ -81,6 +81,12 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         scope.launch {
             context.logsDataStore.edit { prefs ->
                 val current = parseInterceptLogs(prefs[INTERCEPT_LOGS_KEY] ?: "[]").toMutableList()
+                
+                val latestFromPackage = current.firstOrNull { it.packageName == packageName }
+                if (latestFromPackage != null && latestFromPackage.title == title && latestFromPackage.text == text) {
+                    return@edit
+                }
+
                 current.add(0, log)
                 if (current.size > 80) current.removeLast()
                 prefs[INTERCEPT_LOGS_KEY] = serializeInterceptLogs(current)
