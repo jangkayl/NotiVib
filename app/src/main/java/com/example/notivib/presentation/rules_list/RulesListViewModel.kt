@@ -32,7 +32,7 @@ class RulesListViewModel @Inject constructor(
     val logs: StateFlow<List<NotificationLog>> = notificationLogRepository.logs
     val systemLogs: StateFlow<List<String>> = notificationLogRepository.systemLogs
 
-    fun saveRule(id: String?, targetPackage: String, keyword: String, start: Int, end: Int, vibrationOnly: Boolean) {
+    fun saveRule(id: String?, targetPackage: String, keyword: String, start: Int, end: Int, vibrationOnly: Boolean, isActive: Boolean, activeDays: Set<Int>) {
         viewModelScope.launch {
             saveRuleUseCase(
                 AlarmRule(
@@ -41,9 +41,17 @@ class RulesListViewModel @Inject constructor(
                     keyword = keyword,
                     startTimeMinute = start,
                     endTimeMinute = end,
-                    vibrationOnly = vibrationOnly
+                    vibrationOnly = vibrationOnly,
+                    isActive = isActive,
+                    activeDays = activeDays
                 )
             )
+        }
+    }
+
+    fun toggleRuleActive(rule: AlarmRule, isActive: Boolean) {
+        viewModelScope.launch {
+            saveRuleUseCase(rule.copy(isActive = isActive))
         }
     }
 

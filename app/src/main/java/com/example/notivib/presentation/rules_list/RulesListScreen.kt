@@ -277,7 +277,7 @@ fun RulesListScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(rules, key = { it.id }) { rule ->
@@ -288,7 +288,8 @@ fun RulesListScreen(
                             onEdit = { 
                                 editingRule = it
                                 showAddDialog = true 
-                            }
+                            },
+                            onToggleActive = { isActive -> viewModel.toggleRuleActive(rule, isActive) }
                         )
                     }
                 }
@@ -299,8 +300,8 @@ fun RulesListScreen(
             AddRuleDialog(
                 editingRule = editingRule,
                 onDismiss = { showAddDialog = false },
-                onSave = { id, pkg, kw, st, end, vibOnly ->
-                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly)
+                onSave = { id, pkg, kw, st, end, vibOnly, isActive, activeDays ->
+                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly, isActive, activeDays)
                     showAddDialog = false
                 }
             )
@@ -394,14 +395,15 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                     checkedTrackColor = MaterialTheme.colorScheme.primary
-                )
+                ),
+                modifier = Modifier.scale(0.8f)
             )
         }
     }
 }
 
 @Composable
-fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule) -> Unit) {
+fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule) -> Unit, onToggleActive: (Boolean) -> Unit) {
     val context = LocalContext.current
     var friendlyAppName by remember(rule.targetPackage) { mutableStateOf(if (rule.targetPackage == "ANY") "All Applications" else rule.targetPackage) }
 
@@ -454,7 +456,7 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
                     }
                 }
                 
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { onEdit(rule) }, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
                     }
@@ -475,6 +477,38 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
+            
+            Spacer(Modifier.height(20.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("ACTIVE DAYS", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    val daysMap = mapOf(1 to "M", 2 to "T", 3 to "W", 4 to "Th", 5 to "F", 6 to "S", 7 to "Su")
+                    val activeDaysString = if (rule.activeDays.size == 7) "Everyday" 
+                        else rule.activeDays.sorted().joinToString(" • ") { daysMap[it] ?: "" }
+                    Text(
+                        text = activeDaysString,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (rule.isActive) "Active" else "Paused", style = MaterialTheme.typography.labelMedium, color = if (rule.isActive) MaterialTheme.colorScheme.primary else Color.Gray)
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = rule.isActive,
+                        onCheckedChange = onToggleActive,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+            }
             
             Spacer(Modifier.height(20.dp))
             HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
@@ -515,11 +549,14 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
 fun AddRuleDialog(
     editingRule: AlarmRule?,
     onDismiss: () -> Unit,
-    onSave: (String?, String, String, Int, Int, Boolean) -> Unit
+    onSave: (String?, String, String, Int, Int, Boolean, Boolean, Set<Int>) -> Unit
 ) {
     val context = LocalContext.current
     var keyword by remember { mutableStateOf(editingRule?.keyword ?: "") }
     var targetPackage by remember { mutableStateOf(editingRule?.targetPackage ?: "ANY") }
+    
+    var activeDays by remember { mutableStateOf(editingRule?.activeDays ?: setOf(1, 2, 3, 4, 5, 6, 7)) }
+    var isActive by remember { mutableStateOf(editingRule?.isActive ?: true) }
     
     var appName by remember { 
         mutableStateOf(
@@ -672,6 +709,39 @@ fun AddRuleDialog(
                 }
 
                 Spacer(Modifier.height(24.dp))
+                Text("Active Days", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    val daysOfWeek = listOf(1 to "M", 2 to "T", 3 to "W", 4 to "Th", 5 to "F", 6 to "S", 7 to "Su")
+                    daysOfWeek.forEach { (dayInt, dayStr) ->
+                        val isSelected = activeDays.contains(dayInt)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.2f),
+                                    CircleShape
+                                )
+                                .clickable {
+                                    activeDays = if (isSelected) {
+                                        if (activeDays.size > 1) activeDays - dayInt else activeDays
+                                    } else {
+                                        activeDays + dayInt
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = dayStr, 
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold, 
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.Gray
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
                 Text("Time Window", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 
@@ -714,7 +784,7 @@ fun AddRuleDialog(
                     TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
                     Spacer(Modifier.width(12.dp))
                     Button(
-                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly) },
+                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly, isActive, activeDays) },
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                     ) { 
@@ -745,10 +815,13 @@ fun RuleCardPreview() {
                 keyword = "Emergency",
                 startTimeMinute = 480,
                 endTimeMinute = 1200,
-                vibrationOnly = false
+                vibrationOnly = false,
+                isActive = true,
+                activeDays = setOf(1, 2, 3, 4, 5, 6, 7)
             ),
             onDelete = {},
-            onEdit = {}
+            onEdit = {},
+            onToggleActive = {}
         )
     }
 }
@@ -760,7 +833,7 @@ fun AddRuleDialogPreview() {
         AddRuleDialog(
             editingRule = null,
             onDismiss = {},
-            onSave = { _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _ -> }
         )
     }
 }

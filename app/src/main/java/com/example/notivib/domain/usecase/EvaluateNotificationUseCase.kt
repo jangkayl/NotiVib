@@ -24,6 +24,9 @@ class EvaluateNotificationUseCase @Inject constructor(
             }
 
             if (!isWithinTime) continue
+            if (!rule.isActive) continue
+            val currentDay = java.time.LocalDate.now().dayOfWeek.value
+            if (!rule.activeDays.contains(currentDay)) continue
 
             val matchApp = rule.targetPackage.isEmpty() || 
                            packageName.contains(rule.targetPackage, ignoreCase = true) ||

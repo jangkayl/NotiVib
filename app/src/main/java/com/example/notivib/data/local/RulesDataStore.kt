@@ -55,7 +55,13 @@ class RulesDataStore(private val context: Context) {
                         keyword = obj.getString("keyword"),
                         startTimeMinute = obj.getInt("startTimeMinute"),
                         endTimeMinute = obj.getInt("endTimeMinute"),
-                        vibrationOnly = obj.optBoolean("vibrationOnly", false)
+                        vibrationOnly = obj.optBoolean("vibrationOnly", false),
+                        isActive = obj.optBoolean("isActive", true),
+                        activeDays = obj.optJSONArray("activeDays")?.let { arr ->
+                            val days = mutableSetOf<Int>()
+                            for (j in 0 until arr.length()) days.add(arr.getInt(j))
+                            days
+                        } ?: setOf(1, 2, 3, 4, 5, 6, 7)
                     )
                 )
             }
@@ -73,6 +79,8 @@ class RulesDataStore(private val context: Context) {
             obj.put("startTimeMinute", rule.startTimeMinute)
             obj.put("endTimeMinute", rule.endTimeMinute)
             obj.put("vibrationOnly", rule.vibrationOnly)
+            obj.put("isActive", rule.isActive)
+            obj.put("activeDays", JSONArray(rule.activeDays))
             array.put(obj)
         }
         return array.toString()

@@ -8,5 +8,7 @@ data class AlarmRule(
     val keyword: String,
     val startTimeMinute: Int,
     val endTimeMinute: Int,
-    val vibrationOnly: Boolean = false
+    val vibrationOnly: Boolean = false,
+    val isActive: Boolean = true,
+    val activeDays: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7)
 )
