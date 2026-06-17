@@ -10,9 +10,10 @@ Built with **Jetpack Compose**, **Clean Architecture**, and **Dagger Hilt**, Not
 
 * **Global Notification Interception**: Leverages Android's `NotificationListenerService` to passively read all incoming push notifications.
 * **Granular Rule Engine**: 
-  * **App Targeting**: Filter by specific installed apps (e.g., *only Messenger* or *only WhatsApp*).
+  * **App Targeting**: Filter by specific installed apps. Friendly names (e.g., *Messenger*) and exact icons are instantly rendered in the UI instead of raw package names.
   * **Keyword Matching**: Provide multiple comma-separated keywords to scan the notification content (e.g., *URGENT, Boss, Emergency*).
-  * **Time Windows**: Restrict rules to active hours (e.g., 08:00 to 20:00) or leave them running 24/7.
+  * **Time Windows & Day Scheduling**: Restrict rules to active hours (e.g., 08:00 to 20:00) and explicitly select active days of the week (e.g., M, W, F).
+  * **Active Toggles**: Master pause/resume toggles on individual rules to temporarily disable them without deleting.
 * **Aggressive Alarms**: 
   * **Full Alarm Mode**: Triggers a persistent Android 14+ Foreground Service (`ActiveAlarmService`) that blasts the device's alarm ringtone at maximum volume with continuous vibration.
   * **Vibration-Only Mode**: For silent, haptic-only alerts that still refuse to stop until acknowledged.
@@ -105,13 +106,50 @@ To function, NotiVib requires highly elevated system privileges:
 
 ---
 
-## 🛠️ Building & Running
+## 📥 Download & Installation
 
+You can install NotiVib directly on your Android device or build it from source.
+
+### Option 1: Direct APK Download
+Download the latest APK directly from our official Google Drive folder:
+👉 **[Download NotiVib APK here](https://drive.google.com/drive/folders/1MkSZoYEB-yaJ9XSat125DIVbM10n1UHB?usp=sharing)**
+
+### Option 2: Build from Source
 1. Clone the repository.
 2. Open in Android Studio Iguana (or newer).
 3. Let Gradle sync and resolve Dagger Hilt dependencies (`ksp` plugin).
 4. Build the APK via `./gradlew assembleDebug` or click the green **Run** arrow.
 5. *Note: The app requires a physical device or an emulator with Google Play Services to simulate real incoming notifications.*
+
+---
+
+## 🛡️ Setup & Bypassing Google Play Protect
+
+Because NotiVib is an aggressive system-level interceptor that you are side-loading outside of the Google Play Store, Android's Play Protect will flag it as an "Unsafe App". This is expected behavior for custom background services. 
+
+To successfully install the app, follow these steps:
+
+1. When the "Unsafe App Blocked" popup appears, tap **More details**.
+2. Tap **Install anyway**.
+3. Once installed, grant all requested system permissions (Notification Access, Overlay, etc.) when prompted by the app's onboarding screen.
+
+*(Images demonstrating the bypass process)*
+![Example Installation Error](download/0.jpg)
+![Step 1](download/1.jpg)
+![Step 2](download/2.jpg)
+![Step 3](download/3.jpg)
+
+---
+
+## ⚙️ Engine Active Toggle
+
+The app features a master **Engine Active** switch on the main dashboard.
+
+![Engine Active Toggle](download/4.jpg)
+
+**What it does:**
+* **Engine Active (ON)**: The `NotificationListenerService` is actively scanning every incoming notification against your rules. If a match is found, alarms will trigger.
+* **Engine Suspended (OFF)**: The engine completely pauses. The app will ignore all incoming notifications, bypassing your rules entirely, acting as a global "Do Not Disturb" mode for the app without having to turn off individual rules.
 
 ---
 *Developed with modern Android Engineering Standards.*
