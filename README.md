@@ -127,17 +127,28 @@ Download the latest APK directly from our official Google Drive folder:
 
 Because NotiVib is an aggressive system-level interceptor that you are side-loading outside of the Google Play Store, Android's Play Protect will flag it as an "Unsafe App". This is expected behavior for custom background services. 
 
-To successfully install the app, follow these steps:
+To successfully install the app, follow these steps to temporarily disable Play Protect:
 
-1. When the "Unsafe App Blocked" popup appears, tap **More details**.
-2. Tap **Install anyway**.
-3. Once installed, grant all requested system permissions (Notification Access, Overlay, etc.) when prompted by the app's onboarding screen.
+1. Open the **Google Play Store** app on your device.
+2. Tap your profile icon in the top right and select **Play Protect**.
+3. Tap the **Settings (gear icon)** in the top right corner.
+4. Toggle off **Scan apps with Play Protect** (and tap **Turn off** to confirm).
+5. Install the NotiVib APK. 
+6. Once installed, grant all requested system permissions (Notification Access, Overlay, etc.) when prompted by the app's onboarding screen.
 
 *(Images demonstrating the bypass process)*
+
 ![Example Installation Error](download/0.jpg)
+*If you see an "App not installed" or "Blocked by Play Protect" error like this, you must disable the protection first.*
+
 ![Step 1](download/1.jpg)
+*Step 1: Open the Google Play Store, tap your profile picture, and navigate to the **Play Protect** menu.*
+
 ![Step 2](download/2.jpg)
+*Step 2: Tap the **Settings (gear icon)** located in the top right corner of the Play Protect screen.*
+
 ![Step 3](download/3.jpg)
+*Step 3: Toggle off **Scan apps with Play Protect**. You can now successfully install the APK!*
 
 ---
 
