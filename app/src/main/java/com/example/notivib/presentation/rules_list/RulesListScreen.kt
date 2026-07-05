@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,6 +48,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.notivib.domain.model.AlarmRule
 import com.example.notivib.framework.service.InterceptorService
+import com.example.notivib.framework.utils.BatteryOptimizationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -114,30 +116,31 @@ fun RulesListScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingRule by remember { mutableStateOf<AlarmRule?>(null) }
     var showSystemLogsDialog by remember { mutableStateOf(false) }
+    var showStatusCards by remember { mutableStateOf(false) }
     val context = LocalContext.current
     
     var hasNotificationAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
 
     var isServiceEnabled by remember {
-        mutableStateOf(
-            try {
-                val state = context.packageManager.getComponentEnabledSetting(ComponentName(context, InterceptorService::class.java))
-                state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-            } catch (e: Exception) {
-                true
-            }
-        )
+        mutableStateOf(com.example.notivib.framework.utils.EngineState.isGloballyEnabled(context))
     }
+
+    var isIgnoringBatteryOptimizations by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasNotificationAccess = checkNotificationAccess(context)
-                try {
-                    val state = context.packageManager.getComponentEnabledSetting(ComponentName(context, InterceptorService::class.java))
-                    isServiceEnabled = state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                } catch (e: Exception) { }
+                isIgnoringBatteryOptimizations = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+                isServiceEnabled = com.example.notivib.framework.utils.EngineState.isGloballyEnabled(context)
+                
+                if (hasNotificationAccess && isServiceEnabled && !InterceptorService.isConnected) {
+                    try {
+                        val componentName = ComponentName(context, InterceptorService::class.java)
+                        NotificationListenerService.requestRebind(componentName)
+                    } catch (e: Exception) {}
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -166,6 +169,16 @@ fun RulesListScreen(
                         Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
                         Spacer(Modifier.width(12.dp))
                         Text("NotiVib", fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp)
+                        Spacer(Modifier.width(8.dp))
+                        val isEngineActive = hasNotificationAccess && isServiceEnabled
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    color = if (isEngineActive) androidx.compose.ui.graphics.Color.Green else MaterialTheme.colorScheme.error,
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                )
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -173,6 +186,9 @@ fun RulesListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
+                    IconButton(onClick = { showStatusCards = !showStatusCards }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Toggle Status Cards", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     IconButton(onClick = { showSystemLogsDialog = true }) {
                         Icon(Icons.Default.Info, contentDescription = "System Status Logs", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -209,67 +225,87 @@ fun RulesListScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            EngineStatusCard(
-                isActive = hasNotificationAccess && isServiceEnabled,
-                onToggle = { enable ->
-                    isServiceEnabled = enable
-                    try {
-                        val state = if (enable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                        context.packageManager.setComponentEnabledSetting(
-                            ComponentName(context, InterceptorService::class.java),
-                            state,
-                            PackageManager.DONT_KILL_APP
-                        )
-                        if (!enable) {
-                            Toast.makeText(context, "Engine suspended.", Toast.LENGTH_SHORT).show()
+            AnimatedVisibility(visible = showStatusCards) {
+                Column {
+                    EngineStatusCard(
+                        isActive = hasNotificationAccess && isServiceEnabled,
+                        onToggle = { enable ->
+                            isServiceEnabled = enable
+                            com.example.notivib.framework.utils.EngineState.setGloballyEnabled(context, enable)
+                            if (!enable) {
+                                Toast.makeText(context, "Engine suspended.", Toast.LENGTH_SHORT).show()
+                            }
+                            context.sendBroadcast(Intent(context, com.example.notivib.framework.receiver.ScheduleReceiver::class.java))
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            )
+                    )
 
-            if (!permissionGrantedState && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Card(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Post Notifications Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                            modifier = Modifier.fillMaxWidth()
+                    if (!isIgnoringBatteryOptimizations) {
+                        Card(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                         ) {
-                            Text("Grant Permission")
-                        }
-                    }
-                }
-            }
-
-            if (!hasNotificationAccess) {
-                Card(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Notification Access Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                try {
-                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Unable to open settings. Please open manually.", Toast.LENGTH_LONG).show()
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Allow Background Usage Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.height(8.dp))
+                                Text("This app needs background usage allowed to run reliably in the background.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = { 
+                                        try {
+                                            context.startActivity(BatteryOptimizationHelper.getIgnoreBatteryOptimizationIntent(context))
+                                        } catch (e: Exception) {}
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Allow Background Usage")
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                            }
+                        }
+                    }
+
+                    if (!permissionGrantedState && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Card(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                         ) {
-                            Text("Grant Access")
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Post Notifications Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Grant Permission")
+                                }
+                            }
+                        }
+                    }
+
+                    if (!hasNotificationAccess) {
+                        Card(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Notification Access Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Unable to open settings. Please open manually.", Toast.LENGTH_LONG).show()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Grant Access")
+                                }
+                            }
                         }
                     }
                 }
@@ -577,6 +613,7 @@ fun AddRuleDialog(
     var vibrationOnly by remember { mutableStateOf(editingRule?.vibrationOnly ?: false) }
 
     var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
 
     LaunchedEffect(Unit) {
@@ -665,6 +702,16 @@ fun AddRuleDialog(
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text("Select Target Application", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(16.dp))
+                                OutlinedTextField(
+                                    value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    placeholder = { Text("Search apps...") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                Spacer(Modifier.height(8.dp))
                                 LazyColumn(modifier = Modifier.weight(1f)) {
                                     item {
                                         Row(
@@ -681,7 +728,10 @@ fun AddRuleDialog(
                                         }
                                         HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                                     }
-                                    items(installedApps) { app ->
+                                    val filteredApps = installedApps.filter { 
+                                        it.name.contains(searchQuery, ignoreCase = true) || it.packageName.contains(searchQuery, ignoreCase = true) 
+                                    }
+                                    items(filteredApps) { app ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth().clickable {
                                                 targetPackage = app.packageName
@@ -745,27 +795,66 @@ fun AddRuleDialog(
                 Text("Time Window", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
                 
+                var showStartTimePicker by remember { mutableStateOf(false) }
+                var showEndTimePicker by remember { mutableStateOf(false) }
+                
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Start Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Slider(
-                            value = startTimeMinute.toFloat(),
-                            onValueChange = { startTimeMinute = it.toInt() },
-                            valueRange = 0f..1439f,
-                            steps = 95
-                        )
-                        Text(formatTime(startTimeMinute), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { showStartTimePicker = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(formatTime(startTimeMinute), fontWeight = FontWeight.Bold)
+                        }
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("End Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Slider(
-                            value = endTimeMinute.toFloat(),
-                            onValueChange = { endTimeMinute = it.toInt() },
-                            valueRange = 0f..1439f,
-                            steps = 95
-                        )
-                        Text(formatTime(endTimeMinute), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { showEndTimePicker = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(formatTime(endTimeMinute), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                
+                if (showStartTimePicker) {
+                    val timePickerState = rememberTimePickerState(
+                        initialHour = startTimeMinute / 60,
+                        initialMinute = startTimeMinute % 60,
+                        is24Hour = true
+                    )
+                    TimePickerDialog(
+                        onCancel = { showStartTimePicker = false },
+                        onConfirm = {
+                            startTimeMinute = timePickerState.hour * 60 + timePickerState.minute
+                            showStartTimePicker = false
+                        }
+                    ) {
+                        TimePicker(state = timePickerState)
+                    }
+                }
+
+                if (showEndTimePicker) {
+                    val timePickerState = rememberTimePickerState(
+                        initialHour = endTimeMinute / 60,
+                        initialMinute = endTimeMinute % 60,
+                        is24Hour = true
+                    )
+                    TimePickerDialog(
+                        onCancel = { showEndTimePicker = false },
+                        onConfirm = {
+                            endTimeMinute = timePickerState.hour * 60 + timePickerState.minute
+                            showEndTimePicker = false
+                        }
+                    ) {
+                        TimePicker(state = timePickerState)
                     }
                 }
 
@@ -835,5 +924,49 @@ fun AddRuleDialogPreview() {
             onDismiss = {},
             onSave = { _, _, _, _, _, _, _, _ -> }
         )
+    }
+}
+
+@Composable
+fun TimePickerDialog(
+    title: String = "Select Time",
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+    toggle: @Composable () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .width(IntrinsicSize.Min)
+                .height(IntrinsicSize.Min)
+                .background(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surface
+                ),
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                content()
+                Row(modifier = Modifier.height(40.dp).fillMaxWidth()) {
+                    toggle()
+                    Spacer(modifier = Modifier.weight(1f))
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                    TextButton(onClick = onConfirm) { Text("OK") }
+                }
+            }
+        }
     }
 }

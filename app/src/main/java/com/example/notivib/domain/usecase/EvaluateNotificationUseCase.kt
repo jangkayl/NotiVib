@@ -17,10 +17,12 @@ class EvaluateNotificationUseCase @Inject constructor(
         for (rule in rules) {
             val isWithinTime = if (rule.startTimeMinute == 0 && rule.endTimeMinute == 1440) {
                 true
-            } else if (rule.startTimeMinute <= rule.endTimeMinute) {
+            } else if (rule.startTimeMinute < rule.endTimeMinute) {
                 currentMinutes in rule.startTimeMinute..rule.endTimeMinute
-            } else {
+            } else if (rule.startTimeMinute > rule.endTimeMinute) {
                 currentMinutes >= rule.startTimeMinute || currentMinutes <= rule.endTimeMinute
+            } else {
+                true // Full 24-hour period when start and end time are exactly the same
             }
 
             if (!isWithinTime) continue

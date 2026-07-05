@@ -34,6 +34,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.notivib.framework.service.InterceptorService
+import com.example.notivib.framework.utils.BatteryOptimizationHelper
 import com.example.notivib.presentation.rules_list.NotificationLogScreen
 import com.example.notivib.presentation.rules_list.RulesListScreen
 
@@ -63,12 +64,14 @@ fun AppNavigation() {
             } else true
         )
     }
+    var isIgnoringBatteryOptimizations by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasNotificationAccess = checkNotificationAccess(context)
+                isIgnoringBatteryOptimizations = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     hasPostNotificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                 }
@@ -89,6 +92,7 @@ fun AppNavigation() {
         PermissionsScreen(
             hasNotificationAccess = hasNotificationAccess,
             hasPostNotificationPermission = hasPostNotificationPermission,
+            isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
             onPostNotificationResult = { hasPostNotificationPermission = it }
         )
     }
@@ -98,6 +102,7 @@ fun AppNavigation() {
 fun PermissionsScreen(
     hasNotificationAccess: Boolean,
     hasPostNotificationPermission: Boolean,
+    isIgnoringBatteryOptimizations: Boolean,
     onPostNotificationResult: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
@@ -134,6 +139,20 @@ fun PermissionsScreen(
                     description = "Required to run in the background and display alarm states.",
                     icon = Icons.Default.NotificationsActive,
                     onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+
+            if (!isIgnoringBatteryOptimizations) {
+                PermissionCard(
+                    title = "Battery Optimization",
+                    description = "Recommended: Keep the interception engine running reliably in the background. (Skip if enabled in settings but still showing)",
+                    icon = Icons.Default.Security,
+                    onClick = {
+                        try {
+                            context.startActivity(BatteryOptimizationHelper.getIgnoreBatteryOptimizationIntent(context))
+                        } catch (e: Exception) {}
+                    }
                 )
                 Spacer(Modifier.height(16.dp))
             }
@@ -185,6 +204,7 @@ fun PermissionsScreenPreview() {
         PermissionsScreen(
             hasNotificationAccess = false,
             hasPostNotificationPermission = false,
+            isIgnoringBatteryOptimizations = false,
             onPostNotificationResult = {}
         )
     }

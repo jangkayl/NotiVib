@@ -105,7 +105,8 @@ fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
                     color = Color.White, 
                     style = MaterialTheme.typography.headlineLarge, 
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 2.sp
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(

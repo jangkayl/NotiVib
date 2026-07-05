@@ -23,6 +23,10 @@ class InterceptorService : NotificationListenerService() {
 
     private val scope = CoroutineScope(Dispatchers.IO)
 
+    companion object {
+        var isConnected = false
+    }
+
     override fun onCreate() {
         super.onCreate()
         notificationLogRepository.addSystemLog("Service Process Created by Android OS")
@@ -35,16 +39,22 @@ class InterceptorService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        isConnected = true
         notificationLogRepository.addSystemLog("Interceptor Successfully Connected to Notification Stream")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        isConnected = false
         notificationLogRepository.addSystemLog("Interceptor Disconnected from Notification Stream")
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
+        if (!com.example.notivib.framework.utils.EngineState.shouldIntercept(this)) {
+            return
+        }
+
         sbn?.let {
             val packageName = it.packageName
             val extras = it.notification.extras
@@ -70,15 +80,15 @@ class InterceptorService : NotificationListenerService() {
             scope.launch {
                 val matchedRule = evaluateNotificationUseCase.evaluate(packageName, appName, title, fullText)
                 
-                notificationLogRepository.addLog(
-                    appName = appName.ifEmpty { "Unknown" },
-                    packageName = packageName,
-                    title = title.ifEmpty { "No Title" },
-                    text = fullText.ifEmpty { "No Content" },
-                    matchedRule = matchedRule?.let { "Rule: ${it.targetPackage.ifEmpty{"Any App"}} / ${it.keyword.ifEmpty{"Any Keyword"}}" }
-                )
-
                 if (matchedRule != null) {
+                    notificationLogRepository.addLog(
+                        appName = appName.ifEmpty { "Unknown" },
+                        packageName = packageName,
+                        title = title.ifEmpty { "No Title" },
+                        text = fullText.ifEmpty { "No Content" },
+                        matchedRule = "Rule: ${matchedRule.targetPackage.ifEmpty{"Any App"}} / ${matchedRule.keyword.ifEmpty{"Any Keyword"}}"
+                    )
+
                     if (!ActiveAlarmService.isAlarmRunning) {
                         triggerAlarm(appName.ifEmpty { packageName }, matchedRule.keyword.ifEmpty { "Any" }, matchedRule.vibrationOnly)
                     }
