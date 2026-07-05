@@ -80,15 +80,19 @@ class InterceptorService : NotificationListenerService() {
             scope.launch {
                 val matchedRule = evaluateNotificationUseCase.evaluate(packageName, appName, title, fullText)
                 
-                if (matchedRule != null) {
+                val trackedApps = com.example.notivib.framework.utils.EngineState.getTrackedApps(this@InterceptorService)
+                
+                if (matchedRule != null || trackedApps.contains(packageName)) {
                     notificationLogRepository.addLog(
                         appName = appName.ifEmpty { "Unknown" },
                         packageName = packageName,
                         title = title.ifEmpty { "No Title" },
                         text = fullText.ifEmpty { "No Content" },
-                        matchedRule = "Rule: ${matchedRule.targetPackage.ifEmpty{"Any App"}} / ${matchedRule.keyword.ifEmpty{"Any Keyword"}}"
+                        matchedRule = matchedRule?.let { "Rule: ${it.targetPackage.ifEmpty{"Any App"}} / ${it.keyword.ifEmpty{"Any Keyword"}}" }
                     )
+                }
 
+                if (matchedRule != null) {
                     if (!ActiveAlarmService.isAlarmRunning) {
                         triggerAlarm(appName.ifEmpty { packageName }, matchedRule.keyword.ifEmpty { "Any" }, matchedRule.vibrationOnly)
                     }

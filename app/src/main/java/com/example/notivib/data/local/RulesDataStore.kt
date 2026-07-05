@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.notivib.domain.model.AlarmRule
+import com.example.notivib.domain.model.TimeWindow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -61,7 +62,21 @@ class RulesDataStore(private val context: Context) {
                             val days = mutableSetOf<Int>()
                             for (j in 0 until arr.length()) days.add(arr.getInt(j))
                             days
-                        } ?: setOf(1, 2, 3, 4, 5, 6, 7)
+                        } ?: setOf(1, 2, 3, 4, 5, 6, 7),
+                        hasCustomTimeWindows = obj.optBoolean("hasCustomTimeWindows", false),
+                        customTimeWindows = obj.optJSONObject("customTimeWindows")?.let { customWindowsObj ->
+                            val map = mutableMapOf<Int, TimeWindow>()
+                            val keys = customWindowsObj.keys()
+                            while (keys.hasNext()) {
+                                val key = keys.next()
+                                val windowObj = customWindowsObj.getJSONObject(key)
+                                map[key.toInt()] = TimeWindow(
+                                    startTimeMinute = windowObj.getInt("startTimeMinute"),
+                                    endTimeMinute = windowObj.getInt("endTimeMinute")
+                                )
+                            }
+                            map
+                        } ?: emptyMap()
                     )
                 )
             }
@@ -81,6 +96,15 @@ class RulesDataStore(private val context: Context) {
             obj.put("vibrationOnly", rule.vibrationOnly)
             obj.put("isActive", rule.isActive)
             obj.put("activeDays", JSONArray(rule.activeDays))
+            obj.put("hasCustomTimeWindows", rule.hasCustomTimeWindows)
+            val customWindowsObj = JSONObject()
+            rule.customTimeWindows.forEach { (day, window) ->
+                val windowObj = JSONObject()
+                windowObj.put("startTimeMinute", window.startTimeMinute)
+                windowObj.put("endTimeMinute", window.endTimeMinute)
+                customWindowsObj.put(day.toString(), windowObj)
+            }
+            obj.put("customTimeWindows", customWindowsObj)
             array.put(obj)
         }
         return array.toString()

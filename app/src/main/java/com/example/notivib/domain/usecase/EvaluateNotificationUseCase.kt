@@ -15,20 +15,33 @@ class EvaluateNotificationUseCase @Inject constructor(
         val currentMinutes = now.hour * 60 + now.minute
 
         for (rule in rules) {
-            val isWithinTime = if (rule.startTimeMinute == 0 && rule.endTimeMinute == 1440) {
+            if (!rule.isActive) continue
+            val currentDay = java.time.LocalDate.now().dayOfWeek.value
+            if (!rule.activeDays.contains(currentDay)) continue
+
+            val startMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
+                rule.customTimeWindows[currentDay]!!.startTimeMinute
+            } else {
+                rule.startTimeMinute
+            }
+
+            val endMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
+                rule.customTimeWindows[currentDay]!!.endTimeMinute
+            } else {
+                rule.endTimeMinute
+            }
+
+            val isWithinTime = if (startMinute == 0 && endMinute == 1440) {
                 true
-            } else if (rule.startTimeMinute < rule.endTimeMinute) {
-                currentMinutes in rule.startTimeMinute..rule.endTimeMinute
-            } else if (rule.startTimeMinute > rule.endTimeMinute) {
-                currentMinutes >= rule.startTimeMinute || currentMinutes <= rule.endTimeMinute
+            } else if (startMinute < endMinute) {
+                currentMinutes in startMinute..endMinute
+            } else if (startMinute > endMinute) {
+                currentMinutes >= startMinute || currentMinutes <= endMinute
             } else {
                 true // Full 24-hour period when start and end time are exactly the same
             }
 
             if (!isWithinTime) continue
-            if (!rule.isActive) continue
-            val currentDay = java.time.LocalDate.now().dayOfWeek.value
-            if (!rule.activeDays.contains(currentDay)) continue
 
             val matchApp = rule.targetPackage.isEmpty() || 
                            packageName.contains(rule.targetPackage, ignoreCase = true) ||

@@ -28,6 +28,14 @@ object EngineState {
         getPrefs(context).edit().putBoolean(KEY_IS_SCHEDULE_ACTIVE, active).apply()
     }
     
+    fun getTrackedApps(context: Context): Set<String> {
+        return getPrefs(context).getStringSet("tracked_apps", emptySet()) ?: emptySet()
+    }
+
+    fun setTrackedApps(context: Context, packages: Set<String>) {
+        getPrefs(context).edit().putStringSet("tracked_apps", packages).apply()
+    }
+    
     fun shouldIntercept(context: Context): Boolean {
         return isGloballyEnabled(context) && isScheduleActive(context)
     }

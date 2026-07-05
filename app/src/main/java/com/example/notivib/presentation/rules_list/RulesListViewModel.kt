@@ -46,7 +46,11 @@ class RulesListViewModel @Inject constructor(
     val logs: StateFlow<List<NotificationLog>> = notificationLogRepository.logs
     val systemLogs: StateFlow<List<String>> = notificationLogRepository.systemLogs
 
-    fun saveRule(id: String?, targetPackage: String, keyword: String, start: Int, end: Int, vibrationOnly: Boolean, isActive: Boolean, activeDays: Set<Int>) {
+    fun saveRule(
+        id: String?, targetPackage: String, keyword: String, start: Int, end: Int, 
+        vibrationOnly: Boolean, isActive: Boolean, activeDays: Set<Int>,
+        hasCustomWindows: Boolean, customWindows: Map<Int, com.example.notivib.domain.model.TimeWindow>
+    ) {
         viewModelScope.launch {
             saveRuleUseCase(
                 AlarmRule(
@@ -57,7 +61,9 @@ class RulesListViewModel @Inject constructor(
                     endTimeMinute = end,
                     vibrationOnly = vibrationOnly,
                     isActive = isActive,
-                    activeDays = activeDays
+                    activeDays = activeDays,
+                    hasCustomTimeWindows = hasCustomWindows,
+                    customTimeWindows = customWindows
                 )
             )
             triggerEvaluation()

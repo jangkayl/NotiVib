@@ -336,8 +336,8 @@ fun RulesListScreen(
             AddRuleDialog(
                 editingRule = editingRule,
                 onDismiss = { showAddDialog = false },
-                onSave = { id, pkg, kw, st, end, vibOnly, isActive, activeDays ->
-                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly, isActive, activeDays)
+                onSave = { id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows ->
+                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows)
                     showAddDialog = false
                 }
             )
@@ -585,7 +585,7 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
 fun AddRuleDialog(
     editingRule: AlarmRule?,
     onDismiss: () -> Unit,
-    onSave: (String?, String, String, Int, Int, Boolean, Boolean, Set<Int>) -> Unit
+    onSave: (String?, String, String, Int, Int, Boolean, Boolean, Set<Int>, Boolean, Map<Int, com.example.notivib.domain.model.TimeWindow>) -> Unit
 ) {
     val context = LocalContext.current
     var keyword by remember { mutableStateOf(editingRule?.keyword ?: "") }
@@ -611,6 +611,11 @@ fun AddRuleDialog(
     var startTimeMinute by remember { mutableStateOf(editingRule?.startTimeMinute ?: 0) }
     var endTimeMinute by remember { mutableStateOf(editingRule?.endTimeMinute ?: 1439) }
     var vibrationOnly by remember { mutableStateOf(editingRule?.vibrationOnly ?: false) }
+    
+    var hasCustomTimeWindows by remember { mutableStateOf(editingRule?.hasCustomTimeWindows ?: false) }
+    var customTimeWindows by remember { 
+        mutableStateOf(editingRule?.customTimeWindows ?: emptyMap<Int, com.example.notivib.domain.model.TimeWindow>())
+    }
 
     var expanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -792,69 +797,149 @@ fun AddRuleDialog(
                 }
 
                 Spacer(Modifier.height(24.dp))
-                Text("Time Window", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { hasCustomTimeWindows = !hasCustomTimeWindows }.padding(vertical = 8.dp)) {
+                    Checkbox(checked = hasCustomTimeWindows, onCheckedChange = { hasCustomTimeWindows = it })
+                    Spacer(Modifier.width(8.dp))
+                    Text("Custom time window per day", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                }
                 Spacer(Modifier.height(8.dp))
-                
-                var showStartTimePicker by remember { mutableStateOf(false) }
-                var showEndTimePicker by remember { mutableStateOf(false) }
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Start Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Spacer(Modifier.height(4.dp))
-                        OutlinedButton(
-                            onClick = { showStartTimePicker = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(formatTime(startTimeMinute), fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("End Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Spacer(Modifier.height(4.dp))
-                        OutlinedButton(
-                            onClick = { showEndTimePicker = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(formatTime(endTimeMinute), fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                
-                if (showStartTimePicker) {
-                    val timePickerState = rememberTimePickerState(
-                        initialHour = startTimeMinute / 60,
-                        initialMinute = startTimeMinute % 60,
-                        is24Hour = true
-                    )
-                    TimePickerDialog(
-                        onCancel = { showStartTimePicker = false },
-                        onConfirm = {
-                            startTimeMinute = timePickerState.hour * 60 + timePickerState.minute
-                            showStartTimePicker = false
-                        }
-                    ) {
-                        TimePicker(state = timePickerState)
-                    }
-                }
 
-                if (showEndTimePicker) {
-                    val timePickerState = rememberTimePickerState(
-                        initialHour = endTimeMinute / 60,
-                        initialMinute = endTimeMinute % 60,
-                        is24Hour = true
-                    )
-                    TimePickerDialog(
-                        onCancel = { showEndTimePicker = false },
-                        onConfirm = {
-                            endTimeMinute = timePickerState.hour * 60 + timePickerState.minute
-                            showEndTimePicker = false
+                if (!hasCustomTimeWindows) {
+                    Text("Time Window", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(Modifier.height(8.dp))
+                    
+                    var showStartTimePicker by remember { mutableStateOf(false) }
+                    var showEndTimePicker by remember { mutableStateOf(false) }
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Start Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedButton(
+                                onClick = { showStartTimePicker = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(formatTime(startTimeMinute), fontWeight = FontWeight.Bold)
+                            }
                         }
-                    ) {
-                        TimePicker(state = timePickerState)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("End Time", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedButton(
+                                onClick = { showEndTimePicker = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(formatTime(endTimeMinute), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    
+                    if (showStartTimePicker) {
+                        val timePickerState = rememberTimePickerState(
+                            initialHour = startTimeMinute / 60,
+                            initialMinute = startTimeMinute % 60,
+                            is24Hour = true
+                        )
+                        TimePickerDialog(
+                            onCancel = { showStartTimePicker = false },
+                            onConfirm = {
+                                startTimeMinute = timePickerState.hour * 60 + timePickerState.minute
+                                showStartTimePicker = false
+                            }
+                        ) {
+                            TimePicker(state = timePickerState)
+                        }
+                    }
+
+                    if (showEndTimePicker) {
+                        val timePickerState = rememberTimePickerState(
+                            initialHour = endTimeMinute / 60,
+                            initialMinute = endTimeMinute % 60,
+                            is24Hour = true
+                        )
+                        TimePickerDialog(
+                            onCancel = { showEndTimePicker = false },
+                            onConfirm = {
+                                endTimeMinute = timePickerState.hour * 60 + timePickerState.minute
+                                showEndTimePicker = false
+                            }
+                        ) {
+                            TimePicker(state = timePickerState)
+                        }
+                    }
+                } else {
+                    val daysOfWeek = listOf(1 to "Mon", 2 to "Tue", 3 to "Wed", 4 to "Thu", 5 to "Fri", 6 to "Sat", 7 to "Sun")
+                    activeDays.sorted().forEach { dayInt ->
+                        val dayName = daysOfWeek.find { it.first == dayInt }?.second ?: ""
+                        val dayWindow = customTimeWindows[dayInt] ?: com.example.notivib.domain.model.TimeWindow(startTimeMinute, endTimeMinute)
+                        
+                        var showDayStartPicker by remember { mutableStateOf(false) }
+                        var showDayEndPicker by remember { mutableStateOf(false) }
+
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(dayName, modifier = Modifier.width(48.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            
+                            OutlinedButton(
+                                onClick = { showDayStartPicker = true },
+                                modifier = Modifier.weight(1f).padding(end = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(4.dp)
+                            ) {
+                                Text(formatTime(dayWindow.startTimeMinute), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                            
+                            Text("-", color = Color.Gray, modifier = Modifier.padding(horizontal = 4.dp))
+                            
+                            OutlinedButton(
+                                onClick = { showDayEndPicker = true },
+                                modifier = Modifier.weight(1f).padding(start = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(4.dp)
+                            ) {
+                                Text(formatTime(dayWindow.endTimeMinute), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        
+                        if (showDayStartPicker) {
+                            val timePickerState = rememberTimePickerState(
+                                initialHour = dayWindow.startTimeMinute / 60,
+                                initialMinute = dayWindow.startTimeMinute % 60,
+                                is24Hour = true
+                            )
+                            TimePickerDialog(
+                                title = "Select $dayName Start Time",
+                                onCancel = { showDayStartPicker = false },
+                                onConfirm = {
+                                    val newMin = timePickerState.hour * 60 + timePickerState.minute
+                                    customTimeWindows = customTimeWindows.toMutableMap().apply { put(dayInt, dayWindow.copy(startTimeMinute = newMin)) }
+                                    showDayStartPicker = false
+                                }
+                            ) {
+                                TimePicker(state = timePickerState)
+                            }
+                        }
+
+                        if (showDayEndPicker) {
+                            val timePickerState = rememberTimePickerState(
+                                initialHour = dayWindow.endTimeMinute / 60,
+                                initialMinute = dayWindow.endTimeMinute % 60,
+                                is24Hour = true
+                            )
+                            TimePickerDialog(
+                                title = "Select $dayName End Time",
+                                onCancel = { showDayEndPicker = false },
+                                onConfirm = {
+                                    val newMin = timePickerState.hour * 60 + timePickerState.minute
+                                    customTimeWindows = customTimeWindows.toMutableMap().apply { put(dayInt, dayWindow.copy(endTimeMinute = newMin)) }
+                                    showDayEndPicker = false
+                                }
+                            ) {
+                                TimePicker(state = timePickerState)
+                            }
+                        }
                     }
                 }
 
@@ -873,7 +958,7 @@ fun AddRuleDialog(
                     TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
                     Spacer(Modifier.width(12.dp))
                     Button(
-                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly, isActive, activeDays) },
+                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly, isActive, activeDays, hasCustomTimeWindows, customTimeWindows) },
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                     ) { 
@@ -922,7 +1007,7 @@ fun AddRuleDialogPreview() {
         AddRuleDialog(
             editingRule = null,
             onDismiss = {},
-            onSave = { _, _, _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }

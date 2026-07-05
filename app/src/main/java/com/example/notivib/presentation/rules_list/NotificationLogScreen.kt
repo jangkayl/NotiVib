@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,17 +44,23 @@ fun NotificationLogScreen(
     onNavigateBack: () -> Unit = {}
 ) {
     val logs by viewModel.logs.collectAsState()
+    var showTrackedAppsDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var trackedApps by remember { mutableStateOf(com.example.notivib.framework.utils.EngineState.getTrackedApps(context)) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Interception History", fontWeight = FontWeight.Bold) },
+                title = { Text("Notification History", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showTrackedAppsDialog = true }) {
+                        Icon(Icons.Default.FactCheck, contentDescription = "Tracked Apps", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     if (logs.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearInterceptLogs() }) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = "Clear All", tint = Color.Red)
@@ -89,8 +97,120 @@ fun NotificationLogScreen(
             }
         }
     }
+
+    if (showTrackedAppsDialog) {
+        TrackedAppsDialog(
+            initialTrackedApps = trackedApps,
+            onDismiss = { showTrackedAppsDialog = false },
+            onSave = { selectedApps ->
+                trackedApps = selectedApps
+                com.example.notivib.framework.utils.EngineState.setTrackedApps(context, selectedApps)
+                showTrackedAppsDialog = false
+            }
+        )
+    }
 }
 
+@Composable
+fun TrackedAppsDialog(
+    initialTrackedApps: Set<String>,
+    onDismiss: () -> Unit,
+    onSave: (Set<String>) -> Unit
+) {
+    val context = LocalContext.current
+    var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
+    var selectedApps by remember { mutableStateOf(initialTrackedApps) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        installedApps = getInstalledApps(context)
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(vertical = 24.dp),
+            shape = RoundedCornerShape(32.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp).fillMaxSize()) {
+                Text(
+                    text = "Tracked Apps",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Select apps to record in your history.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search apps") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true
+                )
+                
+                Spacer(Modifier.height(16.dp))
+
+                val filteredApps = remember(installedApps, searchQuery) {
+                    installedApps.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                        .sortedWith(
+                            compareByDescending<AppInfo> { initialTrackedApps.contains(it.packageName) }
+                                .thenBy { it.name.lowercase() }
+                        )
+                }
+
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(filteredApps, key = { it.packageName }) { app ->
+                        val isSelected = selectedApps.contains(app.packageName)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedApps = if (isSelected) {
+                                        selectedApps - app.packageName
+                                    } else {
+                                        selectedApps + app.packageName
+                                    }
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AppIconImage(packageName = app.packageName, modifier = Modifier.size(32.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = app.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { onSave(selectedApps) }) { Text("Save") }
+                }
+            }
+        }
+    }
+}
 @Composable
 fun LogItemCard(log: NotificationLog, onDelete: () -> Unit) {
     var showActions by remember { mutableStateOf(false) }
@@ -151,6 +271,17 @@ fun LogItemCard(log: NotificationLog, onDelete: () -> Unit) {
 @Composable
 fun AppIconImage(packageName: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    var drawable by remember(packageName) { mutableStateOf<android.graphics.drawable.Drawable?>(null) }
+    
+    LaunchedEffect(packageName) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val d = context.packageManager.getApplicationIcon(packageName)
+                drawable = d
+            } catch (e: Exception) {}
+        }
+    }
+
     androidx.compose.ui.viewinterop.AndroidView(
         factory = { ctx ->
             android.widget.ImageView(ctx).apply {
@@ -158,11 +289,10 @@ fun AppIconImage(packageName: String, modifier: Modifier = Modifier) {
             }
         },
         update = { imageView ->
-            try {
-                val drawable = context.packageManager.getApplicationIcon(packageName)
+            if (drawable != null) {
                 imageView.setImageDrawable(drawable)
-            } catch (e: Exception) {
-                imageView.setImageResource(android.R.color.darker_gray)
+            } else {
+                imageView.setImageResource(android.R.color.transparent)
             }
         },
         modifier = modifier

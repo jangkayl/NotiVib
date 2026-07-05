@@ -30,22 +30,26 @@ object ScheduleManager {
 
         for (rule in activeRules) {
             val ruleStartsToday = rule.activeDays.contains(currentDay)
-            val isFullDay = rule.startTimeMinute == 0 && rule.endTimeMinute == 1440 || rule.startTimeMinute == rule.endTimeMinute
+            val todayStart = getStartMinute(rule, currentDay)
+            val todayEnd = getEndMinute(rule, currentDay)
+            val isFullDay = todayStart == 0 && todayEnd == 1440 || todayStart == todayEnd
 
             var ruleIsActiveRightNow = false
             
             if (ruleStartsToday) {
                 if (isFullDay) {
                     ruleIsActiveRightNow = true
-                } else if (rule.startTimeMinute < rule.endTimeMinute) {
-                    ruleIsActiveRightNow = currentMinutes in rule.startTimeMinute..rule.endTimeMinute
-                } else if (rule.startTimeMinute > rule.endTimeMinute) {
-                    ruleIsActiveRightNow = currentMinutes >= rule.startTimeMinute || currentMinutes <= rule.endTimeMinute
+                } else if (todayStart < todayEnd) {
+                    ruleIsActiveRightNow = currentMinutes in todayStart..todayEnd
+                } else if (todayStart > todayEnd) {
+                    ruleIsActiveRightNow = currentMinutes >= todayStart || currentMinutes <= todayEnd
                 }
-            } else if (rule.startTimeMinute > rule.endTimeMinute) {
+            } else {
                 // Check if it started yesterday and spans into today
                 val yesterday = now.minusDays(1).dayOfWeek.value
-                if (rule.activeDays.contains(yesterday) && currentMinutes <= rule.endTimeMinute) {
+                val yesterdayStart = getStartMinute(rule, yesterday)
+                val yesterdayEnd = getEndMinute(rule, yesterday)
+                if (rule.activeDays.contains(yesterday) && yesterdayStart > yesterdayEnd && currentMinutes <= yesterdayEnd) {
                     ruleIsActiveRightNow = true
                 }
             }
@@ -55,24 +59,31 @@ object ScheduleManager {
             }
 
             // Calculate next start time and next end time to find the next event
-            val nextStart = getNextTime(now, rule.startTimeMinute, rule.activeDays)
-            val nextEnd = getNextTime(
-                now, 
-                rule.endTimeMinute, 
-                if (rule.startTimeMinute > rule.endTimeMinute) 
-                    rule.activeDays.map { if (it == 7) 1 else it + 1 }.toSet() // ends on the next day
-                else rule.activeDays
-            )
+            // We must check upcoming days because each day can have a different time window
+            for (offset in 0..7) {
+                val targetDay = now.plusDays(offset.toLong())
+                val dayOfWeek = targetDay.dayOfWeek.value
+                
+                if (rule.activeDays.contains(dayOfWeek)) {
+                    val startMin = getStartMinute(rule, dayOfWeek)
+                    val nextStart = targetDay.withHour(startMin / 60).withMinute(startMin % 60).withSecond(0).withNano(0)
+                    
+                    val endMin = getEndMinute(rule, dayOfWeek)
+                    var nextEnd = targetDay.withHour(endMin / 60).withMinute(endMin % 60).withSecond(0).withNano(0)
+                    if (startMin > endMin) {
+                        nextEnd = nextEnd.plusDays(1)
+                    }
 
-            // We only care about events in the future
-            if (nextStart.isAfter(now)) {
-                if (nextEventTime == null || nextStart.isBefore(nextEventTime)) {
-                    nextEventTime = nextStart
-                }
-            }
-            if (nextEnd.isAfter(now)) {
-                if (nextEventTime == null || nextEnd.isBefore(nextEventTime)) {
-                    nextEventTime = nextEnd
+                    if (nextStart.isAfter(now)) {
+                        if (nextEventTime == null || nextStart.isBefore(nextEventTime)) {
+                            nextEventTime = nextStart
+                        }
+                    }
+                    if (nextEnd.isAfter(now)) {
+                        if (nextEventTime == null || nextEnd.isBefore(nextEventTime)) {
+                            nextEventTime = nextEnd
+                        }
+                    }
                 }
             }
         }
@@ -96,6 +107,22 @@ object ScheduleManager {
             } while (!activeDays.contains(targetTime.dayOfWeek.value) && addedDays < 8)
         }
         return targetTime
+    }
+
+    private fun getStartMinute(rule: AlarmRule, day: Int): Int {
+        return if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(day)) {
+            rule.customTimeWindows[day]!!.startTimeMinute
+        } else {
+            rule.startTimeMinute
+        }
+    }
+
+    private fun getEndMinute(rule: AlarmRule, day: Int): Int {
+        return if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(day)) {
+            rule.customTimeWindows[day]!!.endTimeMinute
+        } else {
+            rule.endTimeMinute
+        }
     }
 
     private fun scheduleAlarm(context: Context, time: LocalDateTime) {
