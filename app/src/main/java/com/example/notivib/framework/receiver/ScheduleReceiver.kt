@@ -29,7 +29,7 @@ class ScheduleReceiver : BroadcastReceiver() {
 
             EngineState.setScheduleActive(context, isActive)
 
-            if (EngineState.shouldIntercept(context)) {
+            if (EngineState.shouldIntercept(context) && EngineState.isShowForegroundNotification(context)) {
                 // Start Foreground Service
                 val serviceIntent = Intent(context, EngineForegroundService::class.java)
                 context.startForegroundService(serviceIntent)

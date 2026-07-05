@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Check
@@ -32,6 +33,7 @@ import androidx.core.graphics.drawable.toBitmap
 import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.scale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -47,6 +49,7 @@ fun NotificationLogScreen(
     var showTrackedAppsDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var trackedApps by remember { mutableStateOf(com.example.notivib.framework.utils.EngineState.getTrackedApps(context)) }
+    var searchLogQuery by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -83,16 +86,39 @@ fun NotificationLogScreen(
                 }
             }
         } else {
-            LazyColumn(
+            val filteredLogs = remember(logs, searchLogQuery) {
+                if (searchLogQuery.isBlank()) logs
+                else logs.filter { 
+                    it.title.contains(searchLogQuery, true) || 
+                    it.text.contains(searchLogQuery, true) || 
+                    it.appName.contains(searchLogQuery, true) ||
+                    it.packageName.contains(searchLogQuery, true)
+                }
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .background(MaterialTheme.colorScheme.background),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .background(MaterialTheme.colorScheme.background)
             ) {
-                items(logs) { log ->
-                    LogItemCard(log = log, onDelete = { viewModel.deleteInterceptLog(log) })
+                OutlinedTextField(
+                    value = searchLogQuery,
+                    onValueChange = { searchLogQuery = it },
+                    label = { Text("Search notifications...") },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true
+                )
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredLogs) { log ->
+                        LogItemCard(log = log, onDelete = { viewModel.deleteInterceptLog(log) })
+                    }
                 }
             }
         }
@@ -166,6 +192,37 @@ fun TrackedAppsDialog(
                                 .thenBy { it.name.lowercase() }
                         )
                 }
+
+                val isAllSelected = selectedApps.contains("ALL_APPS")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            selectedApps = if (isAllSelected) selectedApps - "ALL_APPS" else selectedApps + "ALL_APPS"
+                        }
+                        .padding(vertical = 8.dp, horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = "Track All Applications",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                        Switch(
+                            checked = isAllSelected, 
+                            onCheckedChange = { selectedApps = if (it) selectedApps + "ALL_APPS" else selectedApps - "ALL_APPS" },
+                            modifier = Modifier.scale(0.8f)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
 
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     items(filteredApps, key = { it.packageName }) { app ->

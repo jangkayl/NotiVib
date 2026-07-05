@@ -82,7 +82,7 @@ class InterceptorService : NotificationListenerService() {
                 
                 val trackedApps = com.example.notivib.framework.utils.EngineState.getTrackedApps(this@InterceptorService)
                 
-                if (matchedRule != null || trackedApps.contains(packageName)) {
+                if (matchedRule != null || trackedApps.contains("ALL_APPS") || trackedApps.contains(packageName)) {
                     notificationLogRepository.addLog(
                         appName = appName.ifEmpty { "Unknown" },
                         packageName = packageName,

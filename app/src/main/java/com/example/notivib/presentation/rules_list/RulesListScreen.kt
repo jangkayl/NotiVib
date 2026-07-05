@@ -263,6 +263,37 @@ fun RulesListScreen(
                         }
                     }
 
+                    var showForegroundNotification by remember { mutableStateOf(com.example.notivib.framework.utils.EngineState.isShowForegroundNotification(context)) }
+                    Card(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Persistent Notification", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Keep NotiVib alive in the background. Disabling this hides the notification but may cause Android to kill the background engine.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            Switch(
+                                checked = showForegroundNotification,
+                                onCheckedChange = { 
+                                    showForegroundNotification = it
+                                    com.example.notivib.framework.utils.EngineState.setShowForegroundNotification(context, it)
+                                    context.sendBroadcast(Intent(context, com.example.notivib.framework.receiver.ScheduleReceiver::class.java))
+                                }
+                            )
+                        }
+                    }
+
                     if (!permissionGrantedState && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         Card(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
@@ -311,12 +342,36 @@ fun RulesListScreen(
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(rules, key = { it.id }) { rule ->
+            if (rules.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp).padding(bottom = 100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "No Interception Rules",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Tap the 'New Rule' button below to start monitoring your notifications for critical keywords.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(rules, key = { it.id }) { rule ->
                     AnimatedVisibility(visible = true) {
                         RuleCard(
                             rule = rule, 
@@ -330,6 +385,7 @@ fun RulesListScreen(
                     }
                 }
             }
+        }
         }
 
         if (showAddDialog) {

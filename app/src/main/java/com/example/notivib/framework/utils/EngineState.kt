@@ -39,4 +39,14 @@ object EngineState {
     fun shouldIntercept(context: Context): Boolean {
         return isGloballyEnabled(context) && isScheduleActive(context)
     }
+
+    private const val KEY_SHOW_FOREGROUND_NOTIFICATION = "show_foreground_notification"
+
+    fun isShowForegroundNotification(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SHOW_FOREGROUND_NOTIFICATION, true)
+    }
+
+    fun setShowForegroundNotification(context: Context, show: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SHOW_FOREGROUND_NOTIFICATION, show).apply()
+    }
 }

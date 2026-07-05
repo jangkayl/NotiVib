@@ -1,6 +1,8 @@
 package com.example.notivib.domain.repository
 
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -43,6 +45,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]")
     }.stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun addSystemLog(message: String) {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         val now = java.time.LocalDateTime.now().format(formatter)
@@ -74,6 +77,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun addLog(appName: String, packageName: String, title: String, text: String, matchedRule: String?) {
         val now = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
         val log = NotificationLog(now, appName, packageName, title, text, matchedRule)
@@ -88,7 +92,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
                 }
 
                 current.add(0, log)
-                if (current.size > 80) current.removeLast()
+                if (current.size > 150) current.removeLast()
                 prefs[INTERCEPT_LOGS_KEY] = serializeInterceptLogs(current)
             }
         }
