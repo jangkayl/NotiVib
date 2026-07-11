@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -21,6 +22,7 @@ import javax.inject.Singleton
 private val Context.logsDataStore by preferencesDataStore(name = "notification_logs_prefs")
 
 data class NotificationLog(
+    val date: String,
     val time: String,
     val appName: String,
     val packageName: String,
@@ -80,7 +82,8 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun addLog(appName: String, packageName: String, title: String, text: String, matchedRule: String?) {
         val now = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-        val log = NotificationLog(now, appName, packageName, title, text, matchedRule)
+        val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val log = NotificationLog(today, now, appName, packageName, title, text, matchedRule)
         
         scope.launch {
             context.logsDataStore.edit { prefs ->
@@ -102,7 +105,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         scope.launch {
             context.logsDataStore.edit { prefs ->
                 val current = parseInterceptLogs(prefs[INTERCEPT_LOGS_KEY] ?: "[]").toMutableList()
-                current.removeAll { it.time == log.time && it.packageName == log.packageName && it.title == log.title }
+                current.removeAll { it.date == log.date && it.time == log.time && it.packageName == log.packageName && it.title == log.title }
                 prefs[INTERCEPT_LOGS_KEY] = serializeInterceptLogs(current)
             }
         }
@@ -121,6 +124,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 list.add(NotificationLog(
+                    date = if (obj.has("date")) obj.getString("date") else LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
                     time = obj.getString("time"),
                     appName = obj.getString("appName"),
                     packageName = obj.getString("packageName"),
@@ -137,6 +141,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         val array = JSONArray()
         logs.forEach { log ->
             val obj = JSONObject()
+            obj.put("date", log.date)
             obj.put("time", log.time)
             obj.put("appName", log.appName)
             obj.put("packageName", log.packageName)

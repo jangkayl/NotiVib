@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.notivib.domain.model.AlarmRule
+import com.example.notivib.domain.model.TimeWindow
 import com.example.notivib.domain.repository.NotificationLog
 import com.example.notivib.domain.repository.NotificationLogRepository
 import com.example.notivib.domain.usecase.DeleteRuleUseCase
@@ -47,9 +48,17 @@ class RulesListViewModel @Inject constructor(
     val systemLogs: StateFlow<List<String>> = notificationLogRepository.systemLogs
 
     fun saveRule(
-        id: String?, targetPackage: String, keyword: String, start: Int, end: Int, 
-        vibrationOnly: Boolean, isActive: Boolean, activeDays: Set<Int>,
-        hasCustomWindows: Boolean, customWindows: Map<Int, com.example.notivib.domain.model.TimeWindow>
+        id: String?, 
+        targetPackage: String, 
+        keyword: String, 
+        startTimeMinute: Int, 
+        endTimeMinute: Int, 
+        vibrationOnly: Boolean,
+        isActive: Boolean = true,
+        activeDays: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
+        hasCustomTimeWindows: Boolean = false,
+        customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
+        muteOutsideSchedule: Boolean = false
     ) {
         viewModelScope.launch {
             saveRuleUseCase(
@@ -57,13 +66,14 @@ class RulesListViewModel @Inject constructor(
                     id = id ?: java.util.UUID.randomUUID().toString(),
                     targetPackage = targetPackage,
                     keyword = keyword,
-                    startTimeMinute = start,
-                    endTimeMinute = end,
+                    startTimeMinute = startTimeMinute,
+                    endTimeMinute = endTimeMinute,
                     vibrationOnly = vibrationOnly,
                     isActive = isActive,
                     activeDays = activeDays,
-                    hasCustomTimeWindows = hasCustomWindows,
-                    customTimeWindows = customWindows
+                    hasCustomTimeWindows = hasCustomTimeWindows,
+                    customTimeWindows = customTimeWindows,
+                    muteOutsideSchedule = muteOutsideSchedule
                 )
             )
             triggerEvaluation()
