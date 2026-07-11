@@ -27,16 +27,16 @@ class EvaluateNotificationUseCase @Inject constructor(
             val currentDay = java.time.LocalDate.now().dayOfWeek.value
             if (!rule.activeDays.contains(currentDay)) continue
 
-            val matchApp = rule.targetPackage.isEmpty() || 
+            val matchApp = rule.targetPackage.isNotEmpty() && (
                            packageName.contains(rule.targetPackage, ignoreCase = true) ||
-                           appName.contains(rule.targetPackage, ignoreCase = true)
+                           appName.contains(rule.targetPackage, ignoreCase = true))
 
             val keywords = rule.keyword.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             val matchKeyword = keywords.isEmpty() || keywords.any { kw ->
                 title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
             }
 
-            if (matchApp && matchKeyword && (rule.targetPackage.isNotEmpty() || rule.keyword.isNotEmpty())) {
+            if (matchApp || (rule.targetPackage.isEmpty() && matchKeyword && rule.keyword.isNotEmpty())) {
                 val startMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
                     rule.customTimeWindows[currentDay]!!.startTimeMinute
                 } else {
@@ -60,8 +60,10 @@ class EvaluateNotificationUseCase @Inject constructor(
                 }
 
                 if (isWithinTime) {
-                    return EvaluationResult.TriggerAlarm(rule)
-                } else if (rule.muteOutsideSchedule) {
+                    if (matchKeyword) {
+                        return EvaluationResult.TriggerAlarm(rule)
+                    }
+                } else if (rule.muteOutsideSchedule && matchApp) {
                     pendingMute = EvaluationResult.Mute(rule)
                 }
             }
