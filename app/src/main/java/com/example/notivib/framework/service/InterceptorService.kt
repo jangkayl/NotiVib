@@ -78,7 +78,13 @@ class InterceptorService : NotificationListenerService() {
             }
 
             scope.launch {
-                val matchedRule = evaluateNotificationUseCase.evaluate(packageName, appName, title, fullText)
+                val evaluationResult = evaluateNotificationUseCase.evaluate(packageName, appName, title, fullText)
+                
+                val matchedRule = when (evaluationResult) {
+                    is com.example.notivib.domain.usecase.EvaluationResult.TriggerAlarm -> evaluationResult.rule
+                    is com.example.notivib.domain.usecase.EvaluationResult.Mute -> evaluationResult.rule
+                    is com.example.notivib.domain.usecase.EvaluationResult.Ignore -> null
+                }
                 
                 val trackedApps = com.example.notivib.framework.utils.EngineState.getTrackedApps(this@InterceptorService)
                 
@@ -92,10 +98,21 @@ class InterceptorService : NotificationListenerService() {
                     )
                 }
 
-                if (matchedRule != null) {
-                    if (!ActiveAlarmService.isAlarmRunning) {
-                        triggerAlarm(appName.ifEmpty { packageName }, matchedRule.keyword.ifEmpty { "Any" }, matchedRule.vibrationOnly)
+                when (evaluationResult) {
+                    is com.example.notivib.domain.usecase.EvaluationResult.TriggerAlarm -> {
+                        if (!ActiveAlarmService.isAlarmRunning) {
+                            triggerAlarm(appName.ifEmpty { packageName }, evaluationResult.rule.keyword.ifEmpty { "Any" }, evaluationResult.rule.vibrationOnly)
+                        }
                     }
+                    is com.example.notivib.domain.usecase.EvaluationResult.Mute -> {
+                        try {
+                            cancelNotification(it.key)
+                            notificationLogRepository.addSystemLog("Silently dismissed notification from $packageName (Focus Mode)")
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    is com.example.notivib.domain.usecase.EvaluationResult.Ignore -> {}
                 }
             }
         }
