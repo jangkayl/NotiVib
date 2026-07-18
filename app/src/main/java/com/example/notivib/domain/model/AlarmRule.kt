@@ -15,5 +15,6 @@ data class AlarmRule(
     val activeDays: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
     val hasCustomTimeWindows: Boolean = false,
     val customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
-    val muteOutsideSchedule: Boolean = false
+    val muteOutsideSchedule: Boolean = false,
+    val remindSchedule: Boolean = false
 )
