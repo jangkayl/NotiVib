@@ -55,9 +55,29 @@ import com.example.notivib.framework.service.ActiveAlarmService
 
 class AlarmActivity : ComponentActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    private val closeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+            if (intent.action == "com.example.notivib.ACTION_CLOSE_ALARM_SCREEN") {
+                finish()
+            }
+        }
+    }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(closeReceiver)
+        } catch (e: Exception) {}
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            closeReceiver,
+            android.content.IntentFilter("com.example.notivib.ACTION_CLOSE_ALARM_SCREEN"),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
 
@@ -80,62 +100,95 @@ class AlarmActivity : ComponentActivity() {
         }
 
         val appName = intent.getStringExtra("APP_NAME") ?: "An App"
-
         val keyword = intent.getStringExtra("KEYWORD") ?: "a keyword"
+        val ruleId = intent.getStringExtra("RULE_ID") ?: ""
+        val mode = intent.getIntExtra(ActiveAlarmService.EXTRA_ALARM_MODE, ActiveAlarmService.MODE_INTERCEPT)
 
         setContent {
-
+            androidx.activity.compose.BackHandler {
+                // Ignore back presses to prevent dismissing the alarm
+            }
             AlarmScreen(
-
                 appName = appName,
-
                 keyword = keyword,
-
+                mode = mode,
                 onAcknowledge = {
-
                     val stopIntent = Intent(this@AlarmActivity, ActiveAlarmService::class.java).apply {
-
                         action = ActiveAlarmService.ACTION_STOP
-
+                        putExtra("APP_NAME", appName)
+                        putExtra("RULE_ID", ruleId)
+                        putExtra(ActiveAlarmService.EXTRA_ALARM_MODE, mode)
                     }
-
                     startService(stopIntent)
-
                     finish()
-
                 }
-
             )
-
         }
 
     }
 
 }
 
-@Composable
+data class Captcha(val prompt: String, val answer: String)
 
-fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
+fun generateCaptcha(): Captcha {
+    val isMath = kotlin.random.Random.nextBoolean()
+    return if (isMath) {
+        val a = kotlin.random.Random.nextInt(10, 50)
+        val b = kotlin.random.Random.nextInt(10, 50)
+        Captcha("What is $a + $b?", (a + b).toString())
+    } else {
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        val str = (1..5).map { chars.random() }.joinToString("")
+        Captcha("Type '$str'", str)
+    }
+}
+
+@Composable
+fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -> Unit) {
+    var captchaAnswer by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    val isFollowUp = mode == ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP || mode == ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP
+    val captcha = androidx.compose.runtime.remember { generateCaptcha() }
+    val isAcknowledgeEnabled = if (isFollowUp) captchaAnswer.equals(captcha.answer, ignoreCase = true) else true
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-
     val pulseAlpha by infiniteTransition.animateFloat(
-
         initialValue = 0.1f,
-
         targetValue = 0.5f,
-
         animationSpec = infiniteRepeatable(
-
             animation = tween(1200, easing = FastOutSlowInEasing),
-
             repeatMode = RepeatMode.Reverse
-
         ),
-
         label = "pulse_alpha"
-
     )
+
+    val themeColor = when (mode) {
+        ActiveAlarmService.MODE_SCHEDULE_START, ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> Color(0xFF00FF00) // Green
+        ActiveAlarmService.MODE_SCHEDULE_END, ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> Color(0xFFFFD700) // Yellow
+        else -> Color.Red
+    }
+    
+    val title = when (mode) {
+        ActiveAlarmService.MODE_SCHEDULE_START -> "SCHEDULE STARTED"
+        ActiveAlarmService.MODE_SCHEDULE_END -> "SCHEDULE ENDED"
+        ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> "FOLLOW-UP REMINDER"
+        ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> "FOLLOW-UP REMINDER"
+        else -> "INTERCEPTION ALERT"
+    }
+
+    val subtitle = when (mode) {
+        ActiveAlarmService.MODE_SCHEDULE_START -> "The interception window has begun."
+        ActiveAlarmService.MODE_SCHEDULE_END -> "The interception window has ended."
+        ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> "Solve the captcha to confirm you are awake and ready for interception."
+        ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> "Solve the captcha to confirm you are awake."
+        else -> "A critical notification has matched your rules."
+    }
+
+    val icon = when (mode) {
+        ActiveAlarmService.MODE_SCHEDULE_START, ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> Icons.Outlined.CircleNotifications
+        ActiveAlarmService.MODE_SCHEDULE_END, ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> Icons.Outlined.CircleNotifications
+        else -> Icons.Filled.Warning
+    }
 
     MaterialTheme {
 
@@ -148,15 +201,10 @@ fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
                     .fillMaxSize()
 
                     .background(
-
                         Brush.radialGradient(
-
-                            colors = listOf(Color.Red.copy(alpha = pulseAlpha), Color.Transparent),
-
+                            colors = listOf(themeColor.copy(alpha = pulseAlpha), Color.Transparent),
                             radius = 1200f
-
                         )
-
                     )
 
             )
@@ -176,66 +224,40 @@ fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
             ) {
 
                 Icon(
-
-                    Icons.Filled.Warning,
-
+                    icon,
                     contentDescription = null,
-
-                    tint = Color.Red,
-
+                    tint = themeColor,
                     modifier = Modifier.size(80.dp)
-
                 )
-
                 Spacer(Modifier.height(24.dp))
-
                 Text(
-
-                    "INTERCEPTION ALERT", 
-
+                    title, 
                     color = Color.White, 
-
                     style = MaterialTheme.typography.headlineLarge, 
-
                     fontWeight = FontWeight.ExtraBold,
-
                     letterSpacing = 2.sp,
-
                     textAlign = TextAlign.Center
-
                 )
 
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-
-                    "A critical notification has matched your rules.", 
-
+                    subtitle, 
                     color = Color.Gray, 
-
                     style = MaterialTheme.typography.bodyLarge,
-
                     textAlign = TextAlign.Center
-
                 )
 
                 Spacer(Modifier.height(48.dp))
 
                 Card(
-
                     modifier = Modifier.fillMaxWidth(),
-
                     shape = RoundedCornerShape(24.dp),
-
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF161618)),
-
-                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f))
-
+                    border = BorderStroke(1.dp, themeColor.copy(alpha = 0.3f))
                 ) {
-
                     Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-
-                        Text("TARGET APPLICATION", style = MaterialTheme.typography.labelMedium, color = Color.Red, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("TARGET APPLICATION", style = MaterialTheme.typography.labelMedium, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
 
                         Spacer(Modifier.height(8.dp))
 
@@ -243,27 +265,51 @@ fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
 
                         Spacer(Modifier.height(24.dp))
 
-                        HorizontalDivider(color = Color.Red.copy(alpha = 0.1f))
-
+                        HorizontalDivider(color = themeColor.copy(alpha = 0.1f))
                         Spacer(Modifier.height(24.dp))
-
-                        Text("MATCHED KEYWORD", style = MaterialTheme.typography.labelMedium, color = Color.Red, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-
-                        Spacer(Modifier.height(8.dp))
-
-                        Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        if (mode == ActiveAlarmService.MODE_INTERCEPT) {
+                            Text("MATCHED KEYWORD", style = MaterialTheme.typography.labelMedium, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        } else {
+                            Text("SCHEDULE", style = MaterialTheme.typography.labelMedium, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Active Interception Phase", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        }
 
                     }
 
                 }
 
+                if (isFollowUp) {
+                    Spacer(Modifier.height(32.dp))
+                    Text(
+                        text = captcha.prompt,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = captchaAnswer,
+                        onValueChange = { captchaAnswer = it },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = themeColor,
+                            unfocusedBorderColor = themeColor.copy(alpha = 0.5f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    )
+                }
+
                 Spacer(Modifier.height(64.dp))
 
                 Button(
-
                     onClick = onAcknowledge,
-
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                    enabled = isAcknowledgeEnabled,
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColor, disabledContainerColor = Color.DarkGray),
 
                     shape = RoundedCornerShape(50),
 
@@ -273,7 +319,7 @@ fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
 
                 ) {
 
-                    Text("ACKNOWLEDGE & DISMISS", fontWeight = FontWeight.ExtraBold, color = Color.White, letterSpacing = 1.sp)
+                    Text("ACKNOWLEDGE & DISMISS", fontWeight = FontWeight.ExtraBold, color = if (mode == ActiveAlarmService.MODE_SCHEDULE_END) Color.Black else Color.White, letterSpacing = 1.sp)
 
                 }
 
@@ -291,6 +337,6 @@ fun AlarmScreen(appName: String, keyword: String, onAcknowledge: () -> Unit) {
 
 fun AlarmScreenPreview() {
 
-    AlarmScreen(appName = "WhatsApp", keyword = "Emergency", onAcknowledge = {})
+    AlarmScreen(appName = "WhatsApp", keyword = "Emergency", mode = ActiveAlarmService.MODE_INTERCEPT, onAcknowledge = {})
 
 }

@@ -64,6 +64,7 @@ class RulesDataStore(private val context: Context) {
                             days
                         } ?: setOf(1, 2, 3, 4, 5, 6, 7),
                         muteOutsideSchedule = obj.optBoolean("muteOutsideSchedule", false),
+                        remindSchedule = obj.optBoolean("remindSchedule", false),
                         hasCustomTimeWindows = obj.optBoolean("hasCustomTimeWindows", false),
                         customTimeWindows = obj.optJSONObject("customTimeWindows")?.let { customWindowsObj ->
                             val map = mutableMapOf<Int, TimeWindow>()
@@ -97,6 +98,7 @@ class RulesDataStore(private val context: Context) {
             obj.put("vibrationOnly", rule.vibrationOnly)
             obj.put("isActive", rule.isActive)
             obj.put("muteOutsideSchedule", rule.muteOutsideSchedule)
+            obj.put("remindSchedule", rule.remindSchedule)
             obj.put("activeDays", JSONArray(rule.activeDays))
             obj.put("hasCustomTimeWindows", rule.hasCustomTimeWindows)
             val customWindowsObj = JSONObject()

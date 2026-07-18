@@ -23,6 +23,12 @@ class ActiveAlarmService : Service() {
         const val ACTION_STOP = "ACTION_STOP"
         private const val CHANNEL_ID = "alarm_channel"
         private const val NOTIFICATION_ID = 1001
+        const val EXTRA_ALARM_MODE = "ALARM_MODE"
+        const val MODE_INTERCEPT = 0
+        const val MODE_SCHEDULE_START = 1
+        const val MODE_SCHEDULE_END = 2
+        const val MODE_SCHEDULE_START_FOLLOWUP = 3
+        const val MODE_SCHEDULE_END_FOLLOWUP = 4
         
         var isAlarmRunning = false
     }
@@ -49,8 +55,26 @@ class ActiveAlarmService : Service() {
             ACTION_START -> {
                 if (!isAlarmRunning) {
                     isAlarmRunning = true
-                    startForeground(NOTIFICATION_ID, buildNotification(intent))
+                    val notification = buildNotification(intent)
+                    startForeground(NOTIFICATION_ID, notification)
                     startAlarm()
+                    try {
+                        val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
+                        val keyword = intent?.getStringExtra("KEYWORD") ?: "a keyword"
+                        val ruleId = intent?.getStringExtra("RULE_ID")
+                        val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
+
+                        val fullScreenIntent = Intent(this, com.example.notivib.presentation.alarm.AlarmActivity::class.java).apply {
+                            putExtra("APP_NAME", appName)
+                            putExtra("KEYWORD", keyword)
+                            putExtra("RULE_ID", ruleId)
+                            putExtra(EXTRA_ALARM_MODE, mode)
+                            this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        startActivity(fullScreenIntent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
             ACTION_STOP -> {
@@ -58,41 +82,86 @@ class ActiveAlarmService : Service() {
                 stopAlarm()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
+
+                val ruleId = intent?.getStringExtra("RULE_ID")
+                val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
+                val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
+
+                if (mode == MODE_SCHEDULE_START || mode == MODE_SCHEDULE_END) {
+                    if (!ruleId.isNullOrEmpty()) {
+                        com.example.notivib.domain.manager.ScheduleReminderManager.scheduleFollowUp(
+                            context = this,
+                            appName = appName,
+                            ruleId = ruleId,
+                            isStart = (mode == MODE_SCHEDULE_START)
+                        )
+                    }
+                }
+
+                val closeIntent = Intent("com.example.notivib.ACTION_CLOSE_ALARM_SCREEN")
+                closeIntent.setPackage(packageName)
+                sendBroadcast(closeIntent)
             }
         }
         return START_STICKY
     }
 
     private fun buildNotification(intent: Intent?): Notification {
-        val stopIntent = Intent(this, ActiveAlarmService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
         val keyword = intent?.getStringExtra("KEYWORD") ?: "a keyword"
+        val ruleId = intent?.getStringExtra("RULE_ID")
+        val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
+
+        val stopIntent = Intent(this, ActiveAlarmService::class.java).apply {
+            action = ACTION_STOP
+            putExtra("APP_NAME", appName)
+            putExtra("RULE_ID", ruleId)
+            putExtra(EXTRA_ALARM_MODE, mode)
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this, System.currentTimeMillis().toInt(), stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
 
         val fullScreenIntent = Intent(this, com.example.notivib.presentation.alarm.AlarmActivity::class.java).apply {
             putExtra("APP_NAME", appName)
             putExtra("KEYWORD", keyword)
+            putExtra("RULE_ID", ruleId)
+            putExtra(EXTRA_ALARM_MODE, mode)
             this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
+        val requestCode = System.currentTimeMillis().toInt()
         val fullScreenPendingIntent = PendingIntent.getActivity(
-            this, 0, fullScreenIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            this, requestCode, fullScreenIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val title = when (mode) {
+            MODE_SCHEDULE_START -> "Schedule Started!"
+            MODE_SCHEDULE_END -> "Schedule Ended!"
+            MODE_SCHEDULE_START_FOLLOWUP -> "Follow-up: Schedule Started"
+            MODE_SCHEDULE_END_FOLLOWUP -> "Follow-up: Schedule Ended"
+            else -> "NotiVib Alarm Active!"
+        }
+        val text = when (mode) {
+            MODE_SCHEDULE_START, MODE_SCHEDULE_START_FOLLOWUP -> "$appName interception is now active."
+            MODE_SCHEDULE_END, MODE_SCHEDULE_END_FOLLOWUP -> "$appName interception has ended."
+            else -> "Matched: $appName - $keyword"
+        }
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("NotiVib Alarm Active!")
-            .setContentText("Matched: $appName - $keyword")
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(true)
             .setFullScreenIntent(fullScreenPendingIntent, true)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "ACKNOWLEDGE", stopPendingIntent)
-            .build()
+            
+        if (mode != MODE_SCHEDULE_START_FOLLOWUP && mode != MODE_SCHEDULE_END_FOLLOWUP) {
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "ACKNOWLEDGE", stopPendingIntent)
+        }
+            
+        return builder.build()
     }
 
     private fun startAlarm() {

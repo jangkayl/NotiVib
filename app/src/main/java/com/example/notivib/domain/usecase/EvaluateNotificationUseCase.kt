@@ -25,11 +25,17 @@ class EvaluateNotificationUseCase @Inject constructor(
         for (rule in rules) {
             if (!rule.isActive) continue
             val currentDay = java.time.LocalDate.now().dayOfWeek.value
-            if (!rule.activeDays.contains(currentDay)) continue
-
+            
             val matchApp = rule.targetPackage.isNotEmpty() && (
                            packageName.contains(rule.targetPackage, ignoreCase = true) ||
                            appName.contains(rule.targetPackage, ignoreCase = true))
+
+            if (!rule.activeDays.contains(currentDay)) {
+                if (rule.muteOutsideSchedule && matchApp) {
+                    pendingMute = EvaluationResult.Mute(rule)
+                }
+                continue
+            }
 
             val keywords = rule.keyword.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             val matchKeyword = keywords.isEmpty() || keywords.any { kw ->

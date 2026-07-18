@@ -11,11 +11,13 @@ import com.example.notivib.domain.repository.NotificationLogRepository
 import com.example.notivib.domain.usecase.DeleteRuleUseCase
 import com.example.notivib.domain.usecase.GetRulesUseCase
 import com.example.notivib.domain.usecase.SaveRuleUseCase
+import com.example.notivib.domain.manager.ScheduleReminderManager
 import com.example.notivib.framework.receiver.ScheduleReceiver
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -58,12 +60,14 @@ class RulesListViewModel @Inject constructor(
         activeDays: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
         hasCustomTimeWindows: Boolean = false,
         customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
-        muteOutsideSchedule: Boolean = false
+        muteOutsideSchedule: Boolean = false,
+        remindSchedule: Boolean = false
     ) {
+        val ruleId = id ?: java.util.UUID.randomUUID().toString()
         viewModelScope.launch {
             saveRuleUseCase(
                 AlarmRule(
-                    id = id ?: java.util.UUID.randomUUID().toString(),
+                    id = ruleId,
                     targetPackage = targetPackage,
                     keyword = keyword,
                     startTimeMinute = startTimeMinute,
@@ -73,10 +77,17 @@ class RulesListViewModel @Inject constructor(
                     activeDays = activeDays,
                     hasCustomTimeWindows = hasCustomTimeWindows,
                     customTimeWindows = customTimeWindows,
-                    muteOutsideSchedule = muteOutsideSchedule
+                    muteOutsideSchedule = muteOutsideSchedule,
+                    remindSchedule = remindSchedule
                 )
             )
             triggerEvaluation()
+            // Wait for save to complete, but rule ID is deterministic or provided
+            val updatedRules = getRulesUseCase().firstOrNull() ?: emptyList()
+            val savedRule = updatedRules.find { it.id == ruleId }
+            if (savedRule != null) {
+                ScheduleReminderManager.scheduleForRule(context, savedRule)
+            }
         }
     }
 
@@ -84,6 +95,7 @@ class RulesListViewModel @Inject constructor(
         viewModelScope.launch {
             saveRuleUseCase(rule.copy(isActive = isActive))
             triggerEvaluation()
+            ScheduleReminderManager.scheduleForRule(context, rule.copy(isActive = isActive))
         }
     }
 
@@ -91,6 +103,7 @@ class RulesListViewModel @Inject constructor(
         viewModelScope.launch {
             deleteRuleUseCase(ruleId)
             triggerEvaluation()
+            ScheduleReminderManager.cancelAlarm(context, ruleId)
         }
     }
 

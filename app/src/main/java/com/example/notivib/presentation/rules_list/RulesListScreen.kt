@@ -543,9 +543,9 @@ fun RulesListScreen(
 
                 onDismiss = { showAddDialog = false },
 
-                onSave = { id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows, muteOutsideSchedule ->
+                onSave = { id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows, muteOutsideSchedule, remindSchedule ->
 
-                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows, muteOutsideSchedule)
+                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows, muteOutsideSchedule, remindSchedule)
 
                     showAddDialog = false
 
@@ -738,10 +738,30 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
 }
 
 @Composable
-
 fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule) -> Unit, onToggleActive: (Boolean) -> Unit) {
-
     val context = LocalContext.current
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Delete Rule?", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete this rule? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirmDialog = false
+                    onDelete(rule)
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     var friendlyAppName by remember(rule.targetPackage) { mutableStateOf(if (rule.targetPackage == "ANY") "All Applications" else rule.targetPackage) }
 
@@ -849,7 +869,7 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
 
                     Spacer(Modifier.width(4.dp))
 
-                    IconButton(onClick = { onDelete(rule) }, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = { showDeleteConfirmDialog = true }, modifier = Modifier.size(36.dp)) {
 
                         Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
 
@@ -1007,7 +1027,7 @@ fun AddRuleDialog(
 
     onDismiss: () -> Unit,
 
-    onSave: (String?, String, String, Int, Int, Boolean, Boolean, Set<Int>, Boolean, Map<Int, com.example.notivib.domain.model.TimeWindow>, Boolean) -> Unit
+    onSave: (String?, String, String, Int, Int, Boolean, Boolean, Set<Int>, Boolean, Map<Int, com.example.notivib.domain.model.TimeWindow>, Boolean, Boolean) -> Unit
 
 ) {
 
@@ -1062,6 +1082,7 @@ fun AddRuleDialog(
     }
 
     var muteOutsideSchedule by remember { mutableStateOf(editingRule?.muteOutsideSchedule ?: false) }
+    var remindSchedule by remember { mutableStateOf(editingRule?.remindSchedule ?: false) }
 
     var expanded by remember { mutableStateOf(false) }
 
@@ -1673,6 +1694,17 @@ fun AddRuleDialog(
 
                 Spacer(Modifier.height(24.dp))
 
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { remindSchedule = !remindSchedule }.padding(vertical = 8.dp)) {
+                    Checkbox(checked = remindSchedule, onCheckedChange = { remindSchedule = it })
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Remind when schedule starts and ends", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Text("Triggers a soft alarm when the active interception window starts and ends.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+                    }
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { muteOutsideSchedule = !muteOutsideSchedule }.padding(vertical = 8.dp)) {
 
                     Checkbox(checked = muteOutsideSchedule, onCheckedChange = { muteOutsideSchedule = it })
@@ -1717,7 +1749,9 @@ fun AddRuleDialog(
 
                     Button(
 
-                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly, isActive, activeDays, hasCustomTimeWindows, customTimeWindows, muteOutsideSchedule) },
+                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly, isActive, activeDays, hasCustomTimeWindows, customTimeWindows, muteOutsideSchedule, remindSchedule) },
+
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF00)),
 
                         shape = RoundedCornerShape(24.dp),
 
@@ -1809,8 +1843,7 @@ fun AddRuleDialogPreview() {
 
             onDismiss = {},
 
-            onSave = { _, _, _, _, _, _, _, _, _, _, _ -> }
-
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _ -> }
         )
 
     }
