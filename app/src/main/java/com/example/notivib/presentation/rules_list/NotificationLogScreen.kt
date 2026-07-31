@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -19,11 +20,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.notivib.domain.repository.NotificationLog
 import com.example.notivib.presentation.theme.SourceSerif4
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -39,13 +46,10 @@ fun NotificationLogScreen(
     val context = LocalContext.current
     var trackedApps by remember { mutableStateOf(com.example.notivib.framework.utils.EngineState.getTrackedApps(context)) }
     var searchLogQuery by remember { mutableStateOf("") }
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = Instant.now().toEpochMilli()
-    )
-    val selectedDateString = remember(datePickerState.selectedDateMillis) {
-        val millis = datePickerState.selectedDateMillis ?: Instant.now().toEpochMilli()
-        Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    var displayedLogsCount by remember { mutableStateOf(20) }
+    
+    LaunchedEffect(searchLogQuery) {
+        displayedLogsCount = 20
     }
 
     Scaffold(
@@ -58,9 +62,7 @@ fun NotificationLogScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showDatePickerDialog = true }) {
-                        Icon(Icons.Outlined.History, contentDescription = "Select Date", tint = Color.White)
-                    }
+
                     IconButton(onClick = { showTrackedAppsDialog = true }) {
                         Icon(com.example.notivib.presentation.theme.icons.list_alt_add, contentDescription = "Tracked Apps", tint = Color.White)
                     }
@@ -77,10 +79,9 @@ fun NotificationLogScreen(
             )
         }
     ) { padding ->
-        val filteredLogs = remember(logs, searchLogQuery, selectedDateString) {
-            val dateFiltered = logs.filter { it.date == selectedDateString }
-            if (searchLogQuery.isBlank()) dateFiltered
-            else dateFiltered.filter { 
+        val filteredLogs = remember(logs, searchLogQuery) {
+            if (searchLogQuery.isBlank()) logs
+            else logs.filter { 
                 it.title.contains(searchLogQuery, true) || 
                 it.text.contains(searchLogQuery, true) || 
                 it.appName.contains(searchLogQuery, true) ||
@@ -114,7 +115,7 @@ fun NotificationLogScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Outlined.NotificationsOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.White.copy(alpha = 0.5f))
                         Spacer(Modifier.height(16.dp))
-                        Text("No notifications for $selectedDateString.", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.titleMedium)
+                        Text("No notifications recorded yet.", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             } else {
@@ -123,31 +124,30 @@ fun NotificationLogScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(filteredLogs) { log ->
+                    val visibleLogs = filteredLogs.take(displayedLogsCount)
+                    itemsIndexed(visibleLogs, key = { index, log -> "${log.date}_${log.time}_${log.packageName}_${log.title}_$index" }) { index, log ->
                         LogItemCard(log = log, onDelete = { viewModel.deleteInterceptLog(log) })
+                    }
+                    
+                    if (displayedLogsCount < filteredLogs.size) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                                Button(
+                                    onClick = { displayedLogsCount += 20 },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9FF0B), contentColor = Color.Black),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Text("Load More", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    if (showDatePickerDialog) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePickerDialog = false },
-            confirmButton = {
-                TextButton(onClick = { showDatePickerDialog = false }) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePickerDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
+
 
     if (showTrackedAppsDialog) {
         TrackedAppsDialog(
@@ -341,30 +341,28 @@ fun LogItemCard(log: NotificationLog, onDelete: () -> Unit) {
 @Composable
 fun AppIconImage(packageName: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    var drawable by remember(packageName) { mutableStateOf<android.graphics.drawable.Drawable?>(null) }
+    var bitmap by remember(packageName) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     LaunchedEffect(packageName) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val d = context.packageManager.getApplicationIcon(packageName)
-                drawable = d
+                val width = if (d.intrinsicWidth > 0) d.intrinsicWidth else 100
+                val height = if (d.intrinsicHeight > 0) d.intrinsicHeight else 100
+                val b = d.toBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                bitmap = b.asImageBitmap()
             } catch (e: Exception) {}
         }
     }
-    androidx.compose.ui.viewinterop.AndroidView(
-        factory = { ctx ->
-            android.widget.ImageView(ctx).apply {
-                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            }
-        },
-        update = { imageView ->
-            if (drawable != null) {
-                imageView.setImageDrawable(drawable)
-            } else {
-                imageView.setImageResource(android.R.color.transparent)
-            }
-        },
-        modifier = modifier
-    )
+    
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bitmap!!,
+            contentDescription = null,
+            modifier = modifier
+        )
+    } else {
+        androidx.compose.foundation.layout.Box(modifier = modifier)
+    }
 }
 
 @Preview
