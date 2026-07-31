@@ -300,10 +300,12 @@ fun RulesListScreen(
                 title = { 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val isEngineActive = hasNotificationAccess && isServiceEnabled
-                        Icon(
-                            Icons.Outlined.GraphicEq, 
-                            contentDescription = null, 
-                            tint = if (isEngineActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, 
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(
+                                id = if (isEngineActive) com.example.notivib.R.drawable.engine_active_indicator 
+                                else com.example.notivib.R.drawable.engine_inactive_indicator
+                            ),
+                            contentDescription = "Engine Status",
                             modifier = Modifier.size(28.dp)
                         )
                         Spacer(Modifier.width(10.dp))
@@ -605,10 +607,13 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
 
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
 
-                Box(
-
-                    modifier = Modifier.size(12.dp).background(if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, CircleShape)
-
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(
+                        id = if (isActive) com.example.notivib.R.drawable.engine_active_indicator 
+                        else com.example.notivib.R.drawable.engine_inactive_indicator
+                    ),
+                    contentDescription = if (isActive) "Engine Active" else "Engine Suspended",
+                    modifier = Modifier.size(16.dp) // Adjusted size for better visibility of the detailed icon
                 )
 
                 Spacer(Modifier.width(16.dp))
