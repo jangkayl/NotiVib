@@ -1,14 +1,17 @@
-# Skill: Android Specification
+---
+name: "NotiVib Specification"
+description: "Instructions for reading and updating project specifications."
+---
+
+# Skill: NotiVib Specification
 
 ## Objective
-Your goal as the @ProductManager is to turn raw user ideas into rigorous technical specifications and **pause for user approval**.
+To understand or update the system architecture and design language of NotiVib.
 
 ## Instructions
-1. **Analyze Requirements**: Deeply analyze the user's idea for the Android app.
-2. **Draft the Document**: Generate a `Technical_Specification.md` that includes:
-   - **Executive Summary**: High-level overview of the Notification Interceptor.
-   - **Architecture**: Enforce Clean Architecture (Presentation, Domain, Data/Framework).
-   - **System Requirements**: Detail required Android Manifest permissions (e.g., `BIND_NOTIFICATION_LISTENER_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS`).
-   - **State Management**: Outline Jetpack Compose state hoisting and DataStore flows.
-3. **Save**: Save `Technical_Specification.md` to the root directory.
-4. **Halt Execution**: Explicitly ask the user: "Do you approve of this specification? You can modify `Technical_Specification.md` now. Reply 'Yes' to proceed to engineering." Wait for their approval before continuing.
+1. **Mandatory Check**: Before proceeding, you MUST read `AGENTS.md` in the root directory.
+2. **Answer-Only Policy**: If the user asks a question about the design or architecture, ONLY answer the question. Do NOT modify any files unless explicitly ordered by the user.
+3. **Reference Docs**:
+   - `Technical_Specification.md`: Defines the Clean Architecture, MVVM structure, DataStore schema, and Service lifecycle.
+   - `UI_UX_Design_System.md`: Defines colors, typography, Material 3 components, and screen layouts.
+4. **Updates**: If the user orders a structural change to the app, you must update the relevant specification document to reflect reality after implementing the code.

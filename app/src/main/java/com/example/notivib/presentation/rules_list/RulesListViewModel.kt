@@ -51,6 +51,7 @@ class RulesListViewModel @Inject constructor(
 
     fun saveRule(
         id: String?, 
+        ruleName: String = "",
         targetPackage: String, 
         keyword: String, 
         startTimeMinute: Int, 
@@ -61,15 +62,24 @@ class RulesListViewModel @Inject constructor(
         hasCustomTimeWindows: Boolean = false,
         customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
         muteOutsideSchedule: Boolean = false,
-        remindSchedule: Boolean = false
+        remindSchedule: Boolean = false,
+        ignoredKeywords: String = ""
     ) {
         val ruleId = id ?: java.util.UUID.randomUUID().toString()
+        val deduplicatedKeyword = keyword
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinctBy { it.lowercase() }
+            .joinToString(",")
+
         viewModelScope.launch {
             saveRuleUseCase(
                 AlarmRule(
                     id = ruleId,
+                    ruleName = ruleName,
                     targetPackage = targetPackage,
-                    keyword = keyword,
+                    keyword = deduplicatedKeyword,
                     startTimeMinute = startTimeMinute,
                     endTimeMinute = endTimeMinute,
                     vibrationOnly = vibrationOnly,
@@ -78,7 +88,8 @@ class RulesListViewModel @Inject constructor(
                     hasCustomTimeWindows = hasCustomTimeWindows,
                     customTimeWindows = customTimeWindows,
                     muteOutsideSchedule = muteOutsideSchedule,
-                    remindSchedule = remindSchedule
+                    remindSchedule = remindSchedule,
+                    ignoredKeywords = ignoredKeywords
                 )
             )
             triggerEvaluation()

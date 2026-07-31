@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.notivib.framework.service.InterceptorService
 import com.example.notivib.framework.utils.BatteryOptimizationHelper
 import androidx.compose.foundation.BorderStroke
+import com.example.notivib.presentation.theme.SourceSerif4
 
 fun checkNotificationAccess(context: android.content.Context): Boolean {
     return try {
@@ -43,7 +44,10 @@ fun checkNotificationAccess(context: android.content.Context): Boolean {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onNavigateBack: () -> Unit) {
+fun SettingsScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToLogs: () -> Unit = {}
+) {
     val context = LocalContext.current
     var hasNotificationAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
     var isServiceEnabled by remember {
@@ -88,10 +92,10 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title = { Text("Settings", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        Icon(com.example.notivib.presentation.theme.icons.arrow_back_ios_new, contentDescription = "Back", tint = androidx.compose.ui.graphics.Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -106,7 +110,11 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Spacer(Modifier.height(4.dp))
+            
             EngineStatusCard(
                 isActive = hasNotificationAccess && isServiceEnabled,
                 onToggle = { enable ->
@@ -119,77 +127,24 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                 }
             )
             
-            if (!canDrawOverlays && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Card(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Display Over Other Apps Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Text("This allows the interception screen to forcibly pop up even when you are using the phone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { 
-                                try {
-                                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}"))
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Unable to open settings. Please open manually.", Toast.LENGTH_LONG).show()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Grant Permission")
-                        }
-                    }
-                }
-            }
-
-            if (!isIgnoringBatteryOptimizations) {
-                Card(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Allow Background Usage Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Text("This app needs background usage allowed to run reliably in the background.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { 
-                                try {
-                                    batteryLauncher.launch(BatteryOptimizationHelper.getIgnoreBatteryOptimizationIntent(context))
-                                } catch (e: Exception) {}
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Allow Background Usage")
-                        }
-                    }
-                }
-            }
-            
             var showForegroundNotification by remember { mutableStateOf(com.example.notivib.framework.utils.EngineState.isShowForegroundNotification(context)) }
             Card(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Persistent Notification", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Persistent Notification", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color.White)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Keep NotiVib alive in the background. Disabling this hides the notification but may cause Android to kill the background engine.",
+                            "Keep NotiVib alive in the background.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
                         )
                     }
                     Spacer(Modifier.width(16.dp))
@@ -199,57 +154,82 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                             showForegroundNotification = it
                             com.example.notivib.framework.utils.EngineState.setShowForegroundNotification(context, it)
                             context.sendBroadcast(Intent(context, com.example.notivib.framework.receiver.ScheduleReceiver::class.java))
-                        }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.background,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                 }
             }
-            
-            if (!permissionGrantedState && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+            if (!canDrawOverlays && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 Card(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Post Notifications Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Display Over Other Apps Required", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Required to display full screen interception alerts.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f))
+                        Spacer(Modifier.height(16.dp))
                         Button(
-                            onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                            modifier = Modifier.fillMaxWidth()
+                            onClick = { 
+                                try {
+                                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Unable to open settings.", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                            shape = RoundedCornerShape(24.dp)
                         ) {
-                            Text("Grant Permission")
+                            Text("Grant Permission", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            if (!isIgnoringBatteryOptimizations) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Allow Background Usage Required", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Prevents OS from stopping engine during deep sleep.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f))
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { 
+                                try {
+                                    batteryLauncher.launch(BatteryOptimizationHelper.getIgnoreBatteryOptimizationIntent(context))
+                                } catch (e: Exception) {}
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                            shape = RoundedCornerShape(24.dp)
+                        ) {
+                            Text("Allow Background Usage", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
             
-            if (!hasNotificationAccess) {
-                Card(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Notification Access Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                try {
-                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Unable to open settings. Please open manually.", Toast.LENGTH_LONG).show()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Grant Access")
-                        }
-                    }
-                }
+            Spacer(Modifier.weight(1f))
+
+            // Notification History Link Button (As per Design Mockup)
+            Button(
+                onClick = onNavigateToLogs,
+                modifier = Modifier.fillMaxWidth().height(52.dp).padding(bottom = 8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                shape = RoundedCornerShape(26.dp)
+            ) {
+                Text("Notification History", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -258,13 +238,12 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
 @Composable
 fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            modifier = Modifier.padding(20.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -276,9 +255,10 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
                 Column {
                     Text(
                         if (isActive) "Engine Active" else "Engine Suspended",
+                        fontFamily = SourceSerif4,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = androidx.compose.ui.graphics.Color.White
                     )
                     Text(
                         if (isActive) "Intercepting notifications" else "All rules are paused",
@@ -291,7 +271,7 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
                 checked = isActive,
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedThumbColor = MaterialTheme.colorScheme.background,
                     checkedTrackColor = MaterialTheme.colorScheme.primary
                 ),
                 modifier = Modifier.scale(0.8f)

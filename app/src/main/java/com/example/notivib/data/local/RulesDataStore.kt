@@ -52,6 +52,7 @@ class RulesDataStore(private val context: Context) {
                 list.add(
                     AlarmRule(
                         id = obj.getString("id"),
+                        ruleName = obj.optString("ruleName", ""),
                         targetPackage = obj.getString("targetPackage"),
                         keyword = obj.getString("keyword"),
                         startTimeMinute = obj.getInt("startTimeMinute"),
@@ -65,6 +66,7 @@ class RulesDataStore(private val context: Context) {
                         } ?: setOf(1, 2, 3, 4, 5, 6, 7),
                         muteOutsideSchedule = obj.optBoolean("muteOutsideSchedule", false),
                         remindSchedule = obj.optBoolean("remindSchedule", false),
+                        ignoredKeywords = obj.optString("ignoredKeywords", ""),
                         hasCustomTimeWindows = obj.optBoolean("hasCustomTimeWindows", false),
                         customTimeWindows = obj.optJSONObject("customTimeWindows")?.let { customWindowsObj ->
                             val map = mutableMapOf<Int, TimeWindow>()
@@ -91,6 +93,7 @@ class RulesDataStore(private val context: Context) {
         rules.forEach { rule ->
             val obj = JSONObject()
             obj.put("id", rule.id)
+            obj.put("ruleName", rule.ruleName)
             obj.put("targetPackage", rule.targetPackage)
             obj.put("keyword", rule.keyword)
             obj.put("startTimeMinute", rule.startTimeMinute)
@@ -99,6 +102,7 @@ class RulesDataStore(private val context: Context) {
             obj.put("isActive", rule.isActive)
             obj.put("muteOutsideSchedule", rule.muteOutsideSchedule)
             obj.put("remindSchedule", rule.remindSchedule)
+            obj.put("ignoredKeywords", rule.ignoredKeywords)
             obj.put("activeDays", JSONArray(rule.activeDays))
             obj.put("hasCustomTimeWindows", rule.hasCustomTimeWindows)
             val customWindowsObj = JSONObject()

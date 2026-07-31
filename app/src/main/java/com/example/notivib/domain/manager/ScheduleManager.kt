@@ -7,9 +7,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.notivib.domain.model.AlarmRule
 import com.example.notivib.framework.receiver.ScheduleReceiver
-import java.time.DayOfWeek
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
 
 object ScheduleManager {
@@ -88,25 +86,13 @@ object ScheduleManager {
             }
         }
 
+        val hasMuteRules = activeRules.any { it.muteOutsideSchedule }
+
         nextEventTime?.let {
             scheduleAlarm(context, it)
         } ?: cancelAlarm(context)
 
-        return isAnyRuleActive
-    }
-
-    private fun getNextTime(now: LocalDateTime, minuteOfDay: Int, activeDays: Set<Int>): LocalDateTime {
-        var targetTime = now.withHour(minuteOfDay / 60).withMinute(minuteOfDay % 60).withSecond(0).withNano(0)
-        
-        // If the time has already passed today, or today is not an active day, move to the next valid day
-        if (!activeDays.contains(targetTime.dayOfWeek.value) || targetTime.isBefore(now) || targetTime.isEqual(now)) {
-            var addedDays = 0
-            do {
-                addedDays++
-                targetTime = targetTime.plusDays(1)
-            } while (!activeDays.contains(targetTime.dayOfWeek.value) && addedDays < 8)
-        }
-        return targetTime
+        return isAnyRuleActive || hasMuteRules
     }
 
     private fun getStartMinute(rule: AlarmRule, day: Int): Int {

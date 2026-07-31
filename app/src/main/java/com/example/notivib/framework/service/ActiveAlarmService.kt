@@ -62,12 +62,14 @@ class ActiveAlarmService : Service() {
                         val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
                         val keyword = intent?.getStringExtra("KEYWORD") ?: "a keyword"
                         val ruleId = intent?.getStringExtra("RULE_ID")
+                        val ruleName = intent?.getStringExtra("RULE_NAME") ?: ""
                         val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
 
                         val fullScreenIntent = Intent(this, com.example.notivib.presentation.alarm.AlarmActivity::class.java).apply {
                             putExtra("APP_NAME", appName)
                             putExtra("KEYWORD", keyword)
                             putExtra("RULE_ID", ruleId)
+                            putExtra("RULE_NAME", ruleName)
                             putExtra(EXTRA_ALARM_MODE, mode)
                             this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                         }
@@ -110,6 +112,7 @@ class ActiveAlarmService : Service() {
         val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
         val keyword = intent?.getStringExtra("KEYWORD") ?: "a keyword"
         val ruleId = intent?.getStringExtra("RULE_ID")
+        val ruleName = intent?.getStringExtra("RULE_NAME") ?: ""
         val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
 
         val stopIntent = Intent(this, ActiveAlarmService::class.java).apply {
@@ -127,6 +130,7 @@ class ActiveAlarmService : Service() {
             putExtra("APP_NAME", appName)
             putExtra("KEYWORD", keyword)
             putExtra("RULE_ID", ruleId)
+            putExtra("RULE_NAME", ruleName)
             putExtra(EXTRA_ALARM_MODE, mode)
             this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }

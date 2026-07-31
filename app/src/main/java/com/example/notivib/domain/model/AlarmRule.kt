@@ -6,6 +6,7 @@ data class TimeWindow(val startTimeMinute: Int, val endTimeMinute: Int)
 
 data class AlarmRule(
     val id: String = UUID.randomUUID().toString(),
+    val ruleName: String = "",
     val targetPackage: String,
     val keyword: String,
     val startTimeMinute: Int,
@@ -16,5 +17,6 @@ data class AlarmRule(
     val hasCustomTimeWindows: Boolean = false,
     val customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
     val muteOutsideSchedule: Boolean = false,
-    val remindSchedule: Boolean = false
+    val remindSchedule: Boolean = false,
+    val ignoredKeywords: String = ""
 )

@@ -95,7 +95,9 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
                 }
 
                 current.add(0, log)
-                if (current.size > 150) current.removeLast()
+                if (current.size > 100) {
+                    current.subList(current.size - 20, current.size).clear()
+                }
                 prefs[INTERCEPT_LOGS_KEY] = serializeInterceptLogs(current)
             }
         }

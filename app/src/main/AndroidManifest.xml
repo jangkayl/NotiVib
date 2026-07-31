@@ -18,8 +18,8 @@
     <application
         android:name=".NotiVibApp"
         android:allowBackup="true"
-        android:roundIcon="@drawable/notivib_logo"
-        android:icon="@drawable/notivib_logo"
+        android:roundIcon="@drawable/notivib_new_logo"
+        android:icon="@drawable/notivib_new_logo"
         android:label="NotiVib"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar"

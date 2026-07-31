@@ -1,15 +1,19 @@
-# Skill: Android Generation
+---
+name: "NotiVib Engineering"
+description: "Instructions for modifying the NotiVib codebase."
+---
+
+# Skill: NotiVib Engineering
 
 ## Objective
-Your goal as the @AndroidEngineer is to build the app based strictly on `Technical_Specification.md`, ensuring a highly engaging, modern, and animated UI.
+To implement features, fix bugs, and modify the NotiVib Android application safely and correctly.
 
 ## Instructions
-1. **Scaffold**: Set up the standard Android Gradle project structure (app/src/main/...).
-2. **Data & Domain Layers**: Implement the Preferences DataStore and pure Kotlin Use Cases for notification evaluation.
-3. **Framework Layer**: Implement `NotificationListenerService` and the Foreground Service (MediaPlayer + Vibrator).
-4. **UI Layer (Eye-Catching & Engaging)**: 
-   - **Theme**: Implement a sleek Dark Mode default theme using Material 3. Use vibrant accent colors (e.g., neon green or electric blue) to indicate when the interceptor is "Active".
-   - **Animations**: Use Compose `AnimatedVisibility` for list items when adding/deleting rules. 
-   - **Visual Feedback**: On the main dashboard, implement an `InfiniteTransition` pulsing animation (like a radar or glowing ring) around a central icon to visually communicate that the app is actively listening to notifications.
-   - **Components**: Use modern Material 3 Cards with elevation, rounded corners, and clear typography for the rules list.
-5. **Save**: Ensure all code compiles and is saved to the file system.
+1. **Mandatory Check**: Before proceeding, you MUST read `AGENTS.md` in the root directory.
+2. **Execution Workflow**:
+   - Only modify code if the user gives a direct order.
+   - For non-trivial changes, create an implementation plan and request user approval first.
+   - Execute changes across all relevant Clean Architecture layers (Model -> Data -> Domain -> Presentation).
+3. **Compilation**: After making code changes, you must verify the build by running:
+   `$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; .\gradlew.bat compileDebugKotlin`
+4. **No Dead Code**: Remove unused imports, variables, and files when refactoring. Preserve existing unrelated docstrings.

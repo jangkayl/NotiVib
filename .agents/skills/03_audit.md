@@ -1,13 +1,17 @@
-# Skill: Android Audit
+---
+name: "NotiVib Audit"
+description: "Instructions for auditing the NotiVib codebase."
+---
+
+# Skill: NotiVib Audit
 
 ## Objective
-Your goal as the @QAAuditor is to ensure the generated code won't crash on Android 14/15.
+To audit the codebase for bugs, unused files, and architectural compliance.
 
 ## Instructions
-1. **Assess Alignment**: Compare the codebase against `Technical_Specification.md`.
-2. **Bug Hunting**: Specifically check for:
-   - Missing `startForeground()` calls within 5 seconds of the alarm service starting.
-   - Missing manifest declarations for Foreground Service types.
-   - Proper intent routing for the "Kill Alarm" PendingIntent.
-   - Missing logic to request user exemption from Battery Optimizations.
-3. **Commit Fixes**: Overwrite any flawed files with your revisions and generate an `Audit_Report.md`.
+1. **Mandatory Check**: Before proceeding, you MUST read `AGENTS.md` in the root directory.
+2. **Answer-Only Policy**: If the user asks to investigate or find errors, ONLY report your findings. Do NOT modify or execute fixes without a direct order.
+3. **Verification**: 
+   - Check alignment with `Technical_Specification.md`.
+   - Ensure Android background execution constraints (Foreground Services, Doze mode) are respected.
+   - Check for orphaned files (unused layouts, dead Kotlin/Python scripts).

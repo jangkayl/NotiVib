@@ -102,6 +102,7 @@ class AlarmActivity : ComponentActivity() {
         val appName = intent.getStringExtra("APP_NAME") ?: "An App"
         val keyword = intent.getStringExtra("KEYWORD") ?: "a keyword"
         val ruleId = intent.getStringExtra("RULE_ID") ?: ""
+        val ruleName = intent.getStringExtra("RULE_NAME") ?: ""
         val mode = intent.getIntExtra(ActiveAlarmService.EXTRA_ALARM_MODE, ActiveAlarmService.MODE_INTERCEPT)
 
         setContent {
@@ -112,6 +113,7 @@ class AlarmActivity : ComponentActivity() {
                 appName = appName,
                 keyword = keyword,
                 mode = mode,
+                ruleName = ruleName,
                 onAcknowledge = {
                     val stopIntent = Intent(this@AlarmActivity, ActiveAlarmService::class.java).apply {
                         action = ActiveAlarmService.ACTION_STOP
@@ -145,7 +147,7 @@ fun generateCaptcha(): Captcha {
 }
 
 @Composable
-fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -> Unit) {
+fun AlarmScreen(appName: String, keyword: String, mode: Int, ruleName: String, onAcknowledge: () -> Unit) {
     var captchaAnswer by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     val isFollowUp = mode == ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP || mode == ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP
     val captcha = androidx.compose.runtime.remember { generateCaptcha() }
@@ -210,19 +212,12 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
             )
 
             Column(
-
                 modifier = Modifier
-
                     .fillMaxSize()
-
                     .padding(32.dp),
-
                 verticalArrangement = Arrangement.Center,
-
                 horizontalAlignment = Alignment.CenterHorizontally
-
             ) {
-
                 Icon(
                     icon,
                     contentDescription = null,
@@ -234,6 +229,7 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
                     title, 
                     color = Color.White, 
                     style = MaterialTheme.typography.headlineLarge, 
+                    fontFamily = com.example.notivib.presentation.theme.SourceSerif4,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 2.sp,
                     textAlign = TextAlign.Center
@@ -245,6 +241,7 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
                     subtitle, 
                     color = Color.Gray, 
                     style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = com.example.notivib.presentation.theme.HostGrotesk,
                     textAlign = TextAlign.Center
                 )
 
@@ -257,28 +254,27 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
                     border = BorderStroke(1.dp, themeColor.copy(alpha = 0.3f))
                 ) {
                     Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("TARGET APPLICATION", style = MaterialTheme.typography.labelMedium, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("INTERCEPTION RULE", style = MaterialTheme.typography.labelMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
 
                         Spacer(Modifier.height(8.dp))
 
-                        Text(appName, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Text(ruleName.ifEmpty { appName }, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.SemiBold)
 
                         Spacer(Modifier.height(24.dp))
 
                         HorizontalDivider(color = themeColor.copy(alpha = 0.1f))
                         Spacer(Modifier.height(24.dp))
                         if (mode == ActiveAlarmService.MODE_INTERCEPT) {
-                            Text("MATCHED KEYWORD", style = MaterialTheme.typography.labelMedium, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text("MATCHED KEYWORD", style = MaterialTheme.typography.labelMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                             Spacer(Modifier.height(8.dp))
-                            Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.SemiBold)
                         } else {
-                            Text("SCHEDULE", style = MaterialTheme.typography.labelMedium, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text("SCHEDULE", style = MaterialTheme.typography.labelMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                             Spacer(Modifier.height(8.dp))
-                            Text("Active Interception Phase", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text("Active Interception Phase", color = Color.White, style = MaterialTheme.typography.titleMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.SemiBold)
                         }
 
                     }
-
                 }
 
                 if (isFollowUp) {
@@ -287,12 +283,14 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
                         text = captcha.prompt,
                         color = Color.White,
                         style = MaterialTheme.typography.titleLarge,
+                        fontFamily = com.example.notivib.presentation.theme.HostGrotesk,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
                         value = captchaAnswer,
                         onValueChange = { captchaAnswer = it },
+                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontSize = 16.sp, color = Color.White),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = themeColor,
                             unfocusedBorderColor = themeColor.copy(alpha = 0.5f),
@@ -310,17 +308,11 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
                     onClick = onAcknowledge,
                     enabled = isAcknowledgeEnabled,
                     colors = ButtonDefaults.buttonColors(containerColor = themeColor, disabledContainerColor = Color.DarkGray),
-
                     shape = RoundedCornerShape(50),
-
                     modifier = Modifier.fillMaxWidth().height(64.dp),
-
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-
                 ) {
-
-                    Text("ACKNOWLEDGE & DISMISS", fontWeight = FontWeight.ExtraBold, color = if (mode == ActiveAlarmService.MODE_SCHEDULE_END) Color.Black else Color.White, letterSpacing = 1.sp)
-
+                    Text("ACKNOWLEDGE & DISMISS", fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.ExtraBold, color = if (mode == ActiveAlarmService.MODE_SCHEDULE_END) Color.Black else Color.White, letterSpacing = 1.sp)
                 }
 
             }
@@ -332,11 +324,7 @@ fun AlarmScreen(appName: String, keyword: String, mode: Int, onAcknowledge: () -
 }
 
 @Preview(showBackground = true)
-
 @Composable
-
 fun AlarmScreenPreview() {
-
-    AlarmScreen(appName = "WhatsApp", keyword = "Emergency", mode = ActiveAlarmService.MODE_INTERCEPT, onAcknowledge = {})
-
+    AlarmScreen(appName = "WhatsApp", keyword = "Emergency", mode = ActiveAlarmService.MODE_INTERCEPT, ruleName = "My Rule", onAcknowledge = {})
 }
