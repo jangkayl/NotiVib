@@ -24,6 +24,7 @@ private val DarkColorScheme = darkColorScheme(
 fun NotiVibTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkColorScheme,
+        typography = Typography,
         content = content
     )
 }

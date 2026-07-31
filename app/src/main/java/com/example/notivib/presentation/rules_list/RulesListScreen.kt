@@ -106,6 +106,7 @@ import com.example.notivib.framework.service.InterceptorService
 
 import com.example.notivib.framework.utils.BatteryOptimizationHelper
 
+import com.example.notivib.presentation.theme.SourceSerif4
 import kotlinx.coroutines.Dispatchers
 
 import kotlinx.coroutines.withContext
@@ -203,32 +204,18 @@ suspend fun getInstalledApps(context: Context): List<AppInfo> = withContext(Disp
 @Composable
 
 fun RulesListScreen(
-
     viewModel: RulesListViewModel = hiltViewModel(),
-
     onNavigateToLogs: () -> Unit = {},
-
-    onNavigateToSettings: () -> Unit = {}
-
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToEditRule: (AlarmRule?) -> Unit = {}
 ) {
-
     val rules by viewModel.rules.collectAsState()
-
     val logs by viewModel.logs.collectAsState()
-
     val systemLogs by viewModel.systemLogs.collectAsState()
-
     var selectedTabIndex by remember { mutableStateOf(0) }
-
     val activeRules = rules.filter { it.isActive }
-
     val inactiveRules = rules.filter { !it.isActive }
-
     val currentRulesList = if (selectedTabIndex == 0) activeRules else inactiveRules
-
-    var showAddDialog by remember { mutableStateOf(false) }
-
-    var editingRule by remember { mutableStateOf<AlarmRule?>(null) }
 
     var showSystemLogsDialog by remember { mutableStateOf(false) }
 
@@ -309,23 +296,18 @@ fun RulesListScreen(
     Scaffold(
 
         topBar = {
-
             TopAppBar(
                 title = { 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Text("NotiVib", fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp)
-                        Spacer(Modifier.width(8.dp))
                         val isEngineActive = hasNotificationAccess && isServiceEnabled
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .background(
-                                    color = if (isEngineActive) androidx.compose.ui.graphics.Color.Green else MaterialTheme.colorScheme.error,
-                                    shape = androidx.compose.foundation.shape.CircleShape
-                                )
+                        Icon(
+                            Icons.Outlined.GraphicEq, 
+                            contentDescription = null, 
+                            tint = if (isEngineActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, 
+                            modifier = Modifier.size(28.dp)
                         )
+                        Spacer(Modifier.width(10.dp))
+                        Text("NotiVib", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, color = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -333,106 +315,78 @@ fun RulesListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = androidx.compose.ui.graphics.Color.White)
-                    }
                     IconButton(onClick = { showSystemLogsDialog = true }) {
-                        Icon(Icons.Outlined.Build, contentDescription = "System Status Logs", tint = androidx.compose.ui.graphics.Color.White)
+                        Icon(com.example.notivib.presentation.theme.icons.ecg_heart, contentDescription = "Engine Diagnostics", tint = Color.White)
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = Color.White)
                     }
                 }
             )
         },
         floatingActionButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.End) {
-                FloatingActionButton(
-                    onClick = onNavigateToLogs,
-                    containerColor = androidx.compose.ui.graphics.Color(0xFFE3E3E3),
-                    contentColor = androidx.compose.ui.graphics.Color(0xFF333333),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Icon(Icons.Outlined.History, contentDescription = "Intercept Log")
-                }
-                ExtendedFloatingActionButton(
-                    onClick = { 
-                        editingRule = null
-                        showAddDialog = true 
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = RoundedCornerShape(24.dp),
-                    icon = { Icon(Icons.Outlined.Add, contentDescription = "Add Rule") },
-                    text = { Text("New Rule", fontWeight = FontWeight.Bold) }
-                )
-            }
-        }
+            ExtendedFloatingActionButton(
+                onClick = { onNavigateToEditRule(null) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.background,
+                shape = RoundedCornerShape(24.dp),
+                icon = { Icon(Icons.Outlined.Add, contentDescription = "Add Rule", tint = MaterialTheme.colorScheme.background) },
+                text = { Text("New Rule", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold) }
+            )
+        },
     ) { padding ->
 
         Column(
-
             modifier = Modifier
-
                 .fillMaxSize()
-
                 .padding(padding)
-
                 .background(MaterialTheme.colorScheme.background)
-
         ) {
-
-            TabRow(
-
-                selectedTabIndex = selectedTabIndex,
-
-                containerColor = MaterialTheme.colorScheme.background,
-
-                contentColor = MaterialTheme.colorScheme.primary,
-
-                indicator = { tabPositions ->
-
-                    if (selectedTabIndex < tabPositions.size) {
-
-                        TabRowDefaults.Indicator(
-
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-
-                            color = MaterialTheme.colorScheme.primary
-
-                        )
-
-                    }
-
-                }
-
+            // Custom Segmented Control matching UI/UX design mockup
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .background(Color(0xFF2B2B28), RoundedCornerShape(28.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-
-                Tab(
-
-                    selected = selectedTabIndex == 0,
-
-                    onClick = { selectedTabIndex = 0 },
-
-                    text = { Text("Active", fontWeight = FontWeight.Bold) },
-
-                    selectedContentColor = MaterialTheme.colorScheme.primary,
-
-                    unselectedContentColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f)
-
-                )
-
-                Tab(
-
-                    selected = selectedTabIndex == 1,
-
-                    onClick = { selectedTabIndex = 1 },
-
-                    text = { Text("Inactive", fontWeight = FontWeight.Bold) },
-
-                    selectedContentColor = MaterialTheme.colorScheme.primary,
-
-                    unselectedContentColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f)
-
-                )
-
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .background(
+                            color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            shape = RoundedCornerShape(22.dp)
+                        )
+                        .clickable { selectedTabIndex = 0 },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Active",
+                        fontFamily = SourceSerif4,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.background else Color.White.copy(alpha = 0.7f)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .background(
+                            color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            shape = RoundedCornerShape(22.dp)
+                        )
+                        .clickable { selectedTabIndex = 1 },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Inactive",
+                        fontFamily = SourceSerif4,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.background else Color.White.copy(alpha = 0.7f)
+                    )
+                }
             }
 
             if (currentRulesList.isEmpty()) {
@@ -504,11 +458,7 @@ fun RulesListScreen(
                             onDelete = { viewModel.deleteRule(it.id) },
 
                             onEdit = { 
-
-                                editingRule = it
-
-                                showAddDialog = true 
-
+                                onNavigateToEditRule(it)
                             },
 
                             onToggleActive = { isActive -> 
@@ -535,26 +485,6 @@ fun RulesListScreen(
 
         }
 
-        if (showAddDialog) {
-
-            AddRuleDialog(
-
-                editingRule = editingRule,
-
-                onDismiss = { showAddDialog = false },
-
-                onSave = { id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows, muteOutsideSchedule, remindSchedule ->
-
-                    viewModel.saveRule(id, pkg, kw, st, end, vibOnly, isActive, activeDays, hasCustomWindows, customWindows, muteOutsideSchedule, remindSchedule)
-
-                    showAddDialog = false
-
-                }
-
-            )
-
-        }
-
         if (showSystemLogsDialog) {
 
             Dialog(onDismissRequest = { showSystemLogsDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -575,12 +505,10 @@ fun RulesListScreen(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
 
-                            Text("Engine Diagnostics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            Text("Engine Diagnostics", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
 
-                            TextButton(onClick = { viewModel.clearSystemLogs() }) {
-
-                                Text("Clear All", color = MaterialTheme.colorScheme.error)
-
+                            IconButton(onClick = { viewModel.clearSystemLogs() }) {
+                                Icon(Icons.Outlined.CleaningServices, contentDescription = "Clear All", tint = Color.Red)
                             }
 
                         }
@@ -591,7 +519,7 @@ fun RulesListScreen(
 
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
 
-                                Text("All systems nominal.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("All systems nominal.", color = Color.White)
 
                             }
 
@@ -611,7 +539,7 @@ fun RulesListScreen(
 
                                     ) {
 
-                                        Text(log, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                                        Text(log, style = MaterialTheme.typography.bodySmall, color = Color.White, modifier = Modifier.weight(1f))
 
                                         IconButton(onClick = { viewModel.deleteSystemLog(log) }) {
 
@@ -741,23 +669,36 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
 fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule) -> Unit, onToggleActive: (Boolean) -> Unit) {
     val context = LocalContext.current
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    val cardBg = if (rule.isActive) Color(0xFFD9EA7D) else Color(0xFF444444)
+    val textColor = if (rule.isActive) Color(0xFF20201E) else Color.White
+    val subTextColor = if (rule.isActive) Color(0xFF444444) else Color.White.copy(alpha = 0.7f)
 
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
-            title = { Text("Delete Rule?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to delete this rule? This action cannot be undone.") },
+            containerColor = Color(0xFF20201E),
+            title = { Text("Delete Rule?", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, color = Color.White) },
+            text = { Text("Are you sure you want to delete this rule?\nThis action cannot be undone.", color = Color.White.copy(alpha = 0.8f)) },
             confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmDialog = false
-                    onDelete(rule)
-                }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDelete(rule)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = Color.White),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text("Delete", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                    Text("Cancel")
+                Button(
+                    onClick = { showDeleteConfirmDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9EA7D), contentColor = Color(0xFF20201E)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text("Cancel", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -766,1172 +707,143 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
     var friendlyAppName by remember(rule.targetPackage) { mutableStateOf(if (rule.targetPackage == "ANY") "All Applications" else rule.targetPackage) }
 
     LaunchedEffect(rule.targetPackage) {
-
         if (rule.targetPackage != "ANY") {
-
             try {
-
                 val pm = context.packageManager
-
                 val appInfo = pm.getApplicationInfo(rule.targetPackage, 0)
-
                 friendlyAppName = pm.getApplicationLabel(appInfo).toString()
-
-            } catch (e: Exception) {
-
-                // Keep the package name as fallback
-
-            }
-
+            } catch (e: Exception) {}
         }
-
     }
 
+    val displayTitle = if (rule.ruleName.isNotBlank()) rule.ruleName else friendlyAppName
+
     Card(
-
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         shape = RoundedCornerShape(24.dp),
-
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-
-        border = BorderStroke(1.dp, Color.White)
-
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-
-        Column(modifier = Modifier.padding(24.dp)) {
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-
                     if (rule.targetPackage == "ANY") {
-
-                        Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-
-                            Icon(Icons.Outlined.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
-
+                        Box(
+                            modifier = Modifier.size(44.dp).background(Color(0xFF20201E), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Apps, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                         }
-
                     } else {
-
-                        AppIconImage(packageName = rule.targetPackage, modifier = Modifier.size(40.dp))
-
+                        AppIconImage(packageName = rule.targetPackage, modifier = Modifier.size(44.dp))
                     }
 
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(14.dp))
 
                     Column {
-
                         Text(
-
-                            text = friendlyAppName,
-
+                            text = displayTitle,
+                            fontFamily = SourceSerif4,
                             fontWeight = FontWeight.Bold,
-
                             style = MaterialTheme.typography.titleMedium,
-
-                            color = MaterialTheme.colorScheme.onSurface,
-
+                            color = textColor,
                             maxLines = 1
-
                         )
-
-                        if (rule.targetPackage != "ANY") {
-
-                            Text(
-
-                                text = rule.targetPackage,
-
-                                style = MaterialTheme.typography.labelSmall,
-
-                                color = Color.White.copy(alpha = 0.7f),
-
-                                maxLines = 1
-
-                            )
-
-                        }
-
+                        Text(
+                            text = if (rule.targetPackage == "ANY") "all.apps" else rule.targetPackage,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = subTextColor,
+                            maxLines = 1
+                        )
                     }
-
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-
-                    IconButton(onClick = { onEdit(rule) }, modifier = Modifier.size(36.dp)) {
-
-                        Icon(Icons.Outlined.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
-
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = "Menu", tint = textColor)
                     }
-
-                    Spacer(Modifier.width(4.dp))
-
-                    IconButton(onClick = { showDeleteConfirmDialog = true }, modifier = Modifier.size(36.dp)) {
-
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
-
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(Color(0xFF20201E))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit Rule", color = Color.White) },
+                            onClick = {
+                                showMenu = false
+                                onEdit(rule)
+                            },
+                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, tint = Color.White) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete Rule", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showMenu = false
+                                showDeleteConfirmDialog = true
+                            },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                        )
                     }
-
                 }
-
             }
-
-            Spacer(Modifier.height(20.dp))
-
-            Text("MATCHING KEYWORDS", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-
-                text = rule.keyword.replace(",", " • "),
-
-                style = MaterialTheme.typography.bodyLarge,
-
-                color = MaterialTheme.colorScheme.onSurface,
-
-                fontWeight = FontWeight.Medium
-
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-
-                Column {
-
-                    Text("ACTIVE DAYS", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
-
-                    Spacer(Modifier.height(6.dp))
-
-                    val daysMap = mapOf(1 to "M", 2 to "T", 3 to "W", 4 to "Th", 5 to "F", 6 to "S", 7 to "Su")
-
-                    val activeDaysString = if (rule.activeDays.size == 7) "Everyday" 
-
-                        else rule.activeDays.sorted().joinToString(" • ") { daysMap[it] ?: "" }
-
-                    Text(
-
-                        text = activeDaysString,
-
-                        style = MaterialTheme.typography.bodyMedium,
-
-                        color = MaterialTheme.colorScheme.primary,
-
-                        fontWeight = FontWeight.Bold
-
-                    )
-
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-
-                    Text(if (rule.isActive) "Active" else "Paused", style = MaterialTheme.typography.labelMedium, color = if (rule.isActive) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f))
-
-                    Spacer(Modifier.width(8.dp))
-
-                    Switch(
-
-                        checked = rule.isActive,
-
-                        onCheckedChange = onToggleActive,
-
-                        colors = SwitchDefaults.colors(
-
-                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-
-                            checkedTrackColor = MaterialTheme.colorScheme.primary
-
-                        ),
-
-                        modifier = Modifier.scale(0.8f)
-
-                    )
-
-                }
-
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            HorizontalDivider(color = Color.White)
 
             Spacer(Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-
-                    Icon(Icons.Outlined.Schedule, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-
-                    Spacer(Modifier.width(6.dp))
-
-                    Text(
-
-                        text = "${formatTime(rule.startTimeMinute)} - ${formatTime(rule.endTimeMinute)}",
-
-                        style = MaterialTheme.typography.labelMedium,
-
-                        color = Color.White.copy(alpha = 0.5f)
-
-                    )
-
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-
-                    Icon(
-
-                        if (rule.vibrationOnly) Icons.Outlined.Vibration else Icons.Outlined.NotificationsActive, 
-
-                        contentDescription = null, 
-
-                        tint = if (rule.vibrationOnly) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.6f), 
-
-                        modifier = Modifier.size(16.dp)
-
-                    )
-
-                    Spacer(Modifier.width(6.dp))
-
-                    Text(
-
-                        text = if (rule.vibrationOnly) "Vibrate Only" else "Alarm & Vibrate",
-
-                        style = MaterialTheme.typography.labelMedium,
-
-                        color = if (rule.vibrationOnly) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.6f)
-
-                    )
-
-                }
-
-            }
-
-        }
-
-    }
-
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-
-@Composable
-
-fun AddRuleDialog(
-
-    editingRule: AlarmRule?,
-
-    onDismiss: () -> Unit,
-
-    onSave: (String?, String, String, Int, Int, Boolean, Boolean, Set<Int>, Boolean, Map<Int, com.example.notivib.domain.model.TimeWindow>, Boolean, Boolean) -> Unit
-
-) {
-
-    val context = LocalContext.current
-
-    var keyword by remember { mutableStateOf(editingRule?.keyword ?: "") }
-
-    var targetPackage by remember { mutableStateOf(editingRule?.targetPackage ?: "ANY") }
-
-    var activeDays by remember { mutableStateOf(editingRule?.activeDays ?: setOf(1, 2, 3, 4, 5, 6, 7)) }
-
-    var isActive by remember { mutableStateOf(editingRule?.isActive ?: true) }
-
-    var appName by remember { 
-
-        mutableStateOf(
-
-            if (editingRule == null || editingRule.targetPackage == "ANY") "ANY APP"
-
-            else {
-
-                try {
-
-                    val appInfo = context.packageManager.getApplicationInfo(editingRule.targetPackage, 0)
-
-                    context.packageManager.getApplicationLabel(appInfo).toString()
-
-                } catch (e: Exception) {
-
-                    editingRule.targetPackage
-
-                }
-
-            }
-
-        )
-
-    }
-
-    var startTimeMinute by remember { mutableStateOf(editingRule?.startTimeMinute ?: 0) }
-
-    var endTimeMinute by remember { mutableStateOf(editingRule?.endTimeMinute ?: 1439) }
-
-    var vibrationOnly by remember { mutableStateOf(editingRule?.vibrationOnly ?: false) }
-
-    var hasCustomTimeWindows by remember { mutableStateOf(editingRule?.hasCustomTimeWindows ?: false) }
-
-    var customTimeWindows by remember {
-
-        mutableStateOf(editingRule?.customTimeWindows ?: emptyMap<Int, com.example.notivib.domain.model.TimeWindow>())
-
-    }
-
-    var muteOutsideSchedule by remember { mutableStateOf(editingRule?.muteOutsideSchedule ?: false) }
-    var remindSchedule by remember { mutableStateOf(editingRule?.remindSchedule ?: false) }
-
-    var expanded by remember { mutableStateOf(false) }
-
-    var searchQuery by remember { mutableStateOf("") }
-
-    var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-
-        installedApps = getInstalledApps(context)
-
-    }
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-
-        Card(
-
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
-
-            shape = RoundedCornerShape(24.dp),
-
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-
-        ) {
-
-            Column(
-
-                modifier = Modifier.padding(28.dp).verticalScroll(rememberScrollState())
-
+            Text("Keywords", style = MaterialTheme.typography.labelSmall, color = subTextColor, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = rule.keyword.replace(",", " • "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Column {
+                    Text("Active Days", style = MaterialTheme.typography.labelSmall, color = subTextColor, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    val daysMap = mapOf(1 to "M", 2 to "T", 3 to "W", 4 to "Th", 5 to "F", 6 to "S", 7 to "Su")
+                    val activeDaysString = if (rule.activeDays.size == 7) "Everyday" 
+                        else rule.activeDays.sorted().joinToString(" • ") { daysMap[it] ?: "" }
+                    Text(
+                        text = activeDaysString,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
 
-                Text(
-
-                    text = if (editingRule == null) "Create New Rule" else "Edit Rule",
-
-                    style = MaterialTheme.typography.headlineSmall,
-
-                    fontWeight = FontWeight.ExtraBold,
-
-                    color = MaterialTheme.colorScheme.onSurface
-
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-
-                    text = "Configure how the app intercepts and alerts you.",
-
-                    style = MaterialTheme.typography.bodySmall,
-
-                    color = Color.White.copy(alpha = 0.7f)
-
-                )
-
-                Spacer(Modifier.height(28.dp))
-
-                OutlinedTextField(
-
-                    value = keyword,
-
-                    onValueChange = { keyword = it },
-
-                    label = { Text("Trigger Keywords (Comma separated)") },
-
-                    placeholder = { Text("e.g. URGENT, Boss, Emergency") },
-
-                    modifier = Modifier.fillMaxWidth(),
-
-                    shape = RoundedCornerShape(24.dp),
-
-                    colors = OutlinedTextFieldDefaults.colors(
-
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.7f).copy(alpha = 0.3f)
-
+                Button(
+                    onClick = { onToggleActive(!rule.isActive) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF20201E),
+                        contentColor = MaterialTheme.colorScheme.primary
                     ),
-
-                    singleLine = true
-
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Text("Target Application", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp))
-
-                Spacer(Modifier.height(4.dp))
-
-                OutlinedCard(
-
-                    onClick = { expanded = true },
-
-                    modifier = Modifier.fillMaxWidth(),
-
-                    shape = RoundedCornerShape(24.dp),
-
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f).copy(alpha = 0.3f)),
-
-                    colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent)
-
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
                 ) {
-
-                    Row(
-
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-
-                        verticalAlignment = Alignment.CenterVertically
-
-                    ) {
-
-                        if (targetPackage == "ANY") {
-
-                            Icon(Icons.Outlined.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
-
-                            Spacer(Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-
-                                Text("ALL APPLICATIONS", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                            }
-
-                        } else {
-
-                            AppIconImage(packageName = targetPackage, modifier = Modifier.size(32.dp))
-
-                            Spacer(Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-
-                                Text(appName, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                                Text(targetPackage, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
-
-                            }
-
-                        }
-
-                        Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
-
-                    }
-
+                    Text(
+                        text = if (rule.isActive) "Active" else "Activate",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-
-                if (expanded) {
-
-                    Dialog(onDismissRequest = { expanded = false }) {
-
-                        Card(
-
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(8.dp),
-
-                            shape = RoundedCornerShape(24.dp),
-
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-
-                        ) {
-
-                            Column(modifier = Modifier.padding(16.dp)) {
-
-                                Text("Select Target Application", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-                                Spacer(Modifier.height(16.dp))
-
-                                OutlinedTextField(
-
-                                    value = searchQuery,
-
-                                    onValueChange = { searchQuery = it },
-
-                                    placeholder = { Text("Search apps...") },
-
-                                    modifier = Modifier.fillMaxWidth(),
-
-                                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-
-                                    singleLine = true,
-
-                                    shape = RoundedCornerShape(24.dp)
-
-                                )
-
-                                Spacer(Modifier.height(8.dp))
-
-                                LazyColumn(modifier = Modifier.weight(1f)) {
-
-                                    item {
-
-                                        Row(
-
-                                            modifier = Modifier.fillMaxWidth().clickable {
-
-                                                targetPackage = "ANY"
-
-                                                appName = "ANY APP"
-
-                                                expanded = false
-
-                                            }.padding(16.dp),
-
-                                            verticalAlignment = Alignment.CenterVertically
-
-                                        ) {
-
-                                            Icon(Icons.Outlined.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
-
-                                            Spacer(Modifier.width(16.dp))
-
-                                            Text("ALL APPLICATIONS", fontWeight = FontWeight.ExtraBold)
-
-                                        }
-
-                                        HorizontalDivider(color = Color.White.copy(alpha = 0.7f).copy(alpha = 0.2f))
-
-                                    }
-
-                                    val filteredApps = installedApps.filter { 
-
-                                        it.name.contains(searchQuery, ignoreCase = true) || it.packageName.contains(searchQuery, ignoreCase = true) 
-
-                                    }
-
-                                    items(filteredApps) { app ->
-
-                                        Row(
-
-                                            modifier = Modifier.fillMaxWidth().clickable {
-
-                                                targetPackage = app.packageName
-
-                                                appName = app.name
-
-                                                expanded = false
-
-                                            }.padding(16.dp),
-
-                                            verticalAlignment = Alignment.CenterVertically
-
-                                        ) {
-
-                                            AppIconImage(packageName = app.packageName, modifier = Modifier.size(32.dp))
-
-                                            Spacer(Modifier.width(16.dp))
-
-                                            Column {
-
-                                                Text(app.name, fontWeight = FontWeight.SemiBold)
-
-                                                Text(app.packageName, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
-
-                                            }
-
-                                        }
-
-                                    }
-
-                                }
-
-                                Spacer(Modifier.height(16.dp))
-
-                                Button(onClick = { expanded = false }, modifier = Modifier.fillMaxWidth()) {
-
-                                    Text("Cancel")
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Text("Active Days", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                Spacer(Modifier.height(8.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-
-                    val daysOfWeek = listOf(1 to "M", 2 to "T", 3 to "W", 4 to "Th", 5 to "F", 6 to "S", 7 to "Su")
-
-                    daysOfWeek.forEach { (dayInt, dayStr) ->
-
-                        val isSelected = activeDays.contains(dayInt)
-
-                        Box(
-
-                            modifier = Modifier
-
-                                .size(32.dp)
-
-                                .background(
-
-                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f).copy(alpha = 0.2f),
-
-                                    CircleShape
-
-                                )
-
-                                .clickable {
-
-                                    activeDays = if (isSelected) {
-
-                                        if (activeDays.size > 1) activeDays - dayInt else activeDays
-
-                                    } else {
-
-                                        activeDays + dayInt
-
-                                    }
-
-                                },
-
-                            contentAlignment = Alignment.Center
-
-                        ) {
-
-                            Text(
-
-                                text = dayStr, 
-
-                                style = MaterialTheme.typography.labelMedium,
-
-                                fontWeight = FontWeight.Bold, 
-
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White.copy(alpha = 0.7f)
-
-                            )
-
-                        }
-
-                    }
-
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { hasCustomTimeWindows = !hasCustomTimeWindows }.padding(vertical = 8.dp)) {
-
-                    Checkbox(checked = hasCustomTimeWindows, onCheckedChange = { hasCustomTimeWindows = it })
-
-                    Spacer(Modifier.width(8.dp))
-
-                    Text("Custom time window per day", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                if (!hasCustomTimeWindows) {
-
-                    Text("Time Window", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                    Spacer(Modifier.height(8.dp))
-
-                    var showStartTimePicker by remember { mutableStateOf(false) }
-
-                    var showEndTimePicker by remember { mutableStateOf(false) }
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-
-                        Column(modifier = Modifier.weight(1f)) {
-
-                            Text("Start Time", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
-
-                            Spacer(Modifier.height(4.dp))
-
-                            OutlinedButton(
-
-                                onClick = { showStartTimePicker = true },
-
-                                modifier = Modifier.fillMaxWidth(),
-
-                                shape = RoundedCornerShape(24.dp)
-
-                            ) {
-
-                                Text(formatTime(startTimeMinute), fontWeight = FontWeight.Bold)
-
-                            }
-
-                        }
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-
-                            Text("End Time", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
-
-                            Spacer(Modifier.height(4.dp))
-
-                            OutlinedButton(
-
-                                onClick = { showEndTimePicker = true },
-
-                                modifier = Modifier.fillMaxWidth(),
-
-                                shape = RoundedCornerShape(24.dp)
-
-                            ) {
-
-                                Text(formatTime(endTimeMinute), fontWeight = FontWeight.Bold)
-
-                            }
-
-                        }
-
-                    }
-
-                    if (showStartTimePicker) {
-
-                        val timePickerState = rememberTimePickerState(
-
-                            initialHour = startTimeMinute / 60,
-
-                            initialMinute = startTimeMinute % 60,
-
-                            is24Hour = true
-
-                        )
-
-                        TimePickerDialog(
-
-                            onCancel = { showStartTimePicker = false },
-
-                            onConfirm = {
-
-                                startTimeMinute = timePickerState.hour * 60 + timePickerState.minute
-
-                                showStartTimePicker = false
-
-                            }
-
-                        ) {
-
-                            TimePicker(state = timePickerState)
-
-                        }
-
-                    }
-
-                    if (showEndTimePicker) {
-
-                        val timePickerState = rememberTimePickerState(
-
-                            initialHour = endTimeMinute / 60,
-
-                            initialMinute = endTimeMinute % 60,
-
-                            is24Hour = true
-
-                        )
-
-                        TimePickerDialog(
-
-                            onCancel = { showEndTimePicker = false },
-
-                            onConfirm = {
-
-                                endTimeMinute = timePickerState.hour * 60 + timePickerState.minute
-
-                                showEndTimePicker = false
-
-                            }
-
-                        ) {
-
-                            TimePicker(state = timePickerState)
-
-                        }
-
-                    }
-
-                } else {
-
-                    val daysOfWeek = listOf(1 to "Mon", 2 to "Tue", 3 to "Wed", 4 to "Thu", 5 to "Fri", 6 to "Sat", 7 to "Sun")
-
-                    activeDays.sorted().forEach { dayInt ->
-
-                        val dayName = daysOfWeek.find { it.first == dayInt }?.second ?: ""
-
-                        val dayWindow = customTimeWindows[dayInt] ?: com.example.notivib.domain.model.TimeWindow(startTimeMinute, endTimeMinute)
-
-                        var showDayStartPicker by remember { mutableStateOf(false) }
-
-                        var showDayEndPicker by remember { mutableStateOf(false) }
-
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-
-                            Text(dayName, modifier = Modifier.width(48.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-
-                            OutlinedButton(
-
-                                onClick = { showDayStartPicker = true },
-
-                                modifier = Modifier.weight(1f).padding(end = 4.dp),
-
-                                shape = RoundedCornerShape(24.dp),
-
-                                contentPadding = PaddingValues(4.dp)
-
-                            ) {
-
-                                Text(formatTime(dayWindow.startTimeMinute), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
-
-                            }
-
-                            Text("-", color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(horizontal = 4.dp))
-
-                            OutlinedButton(
-
-                                onClick = { showDayEndPicker = true },
-
-                                modifier = Modifier.weight(1f).padding(start = 4.dp),
-
-                                shape = RoundedCornerShape(24.dp),
-
-                                contentPadding = PaddingValues(4.dp)
-
-                            ) {
-
-                                Text(formatTime(dayWindow.endTimeMinute), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
-
-                            }
-
-                        }
-
-                        if (showDayStartPicker) {
-
-                            val timePickerState = rememberTimePickerState(
-
-                                initialHour = dayWindow.startTimeMinute / 60,
-
-                                initialMinute = dayWindow.startTimeMinute % 60,
-
-                                is24Hour = true
-
-                            )
-
-                            TimePickerDialog(
-
-                                title = "Select $dayName Start Time",
-
-                                onCancel = { showDayStartPicker = false },
-
-                                onConfirm = {
-
-                                    val newMin = timePickerState.hour * 60 + timePickerState.minute
-
-                                    customTimeWindows = customTimeWindows.toMutableMap().apply { put(dayInt, dayWindow.copy(startTimeMinute = newMin)) }
-
-                                    showDayStartPicker = false
-
-                                }
-
-                            ) {
-
-                                TimePicker(state = timePickerState)
-
-                            }
-
-                        }
-
-                        if (showDayEndPicker) {
-
-                            val timePickerState = rememberTimePickerState(
-
-                                initialHour = dayWindow.endTimeMinute / 60,
-
-                                initialMinute = dayWindow.endTimeMinute % 60,
-
-                                is24Hour = true
-
-                            )
-
-                            TimePickerDialog(
-
-                                title = "Select $dayName End Time",
-
-                                onCancel = { showDayEndPicker = false },
-
-                                onConfirm = {
-
-                                    val newMin = timePickerState.hour * 60 + timePickerState.minute
-
-                                    customTimeWindows = customTimeWindows.toMutableMap().apply { put(dayInt, dayWindow.copy(endTimeMinute = newMin)) }
-
-                                    showDayEndPicker = false
-
-                                }
-
-                            ) {
-
-                                TimePicker(state = timePickerState)
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { remindSchedule = !remindSchedule }.padding(vertical = 8.dp)) {
-                    Checkbox(checked = remindSchedule, onCheckedChange = { remindSchedule = it })
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Remind when schedule starts and ends", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        Text("Triggers a soft alarm when the active interception window starts and ends.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-                    }
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { muteOutsideSchedule = !muteOutsideSchedule }.padding(vertical = 8.dp)) {
-
-                    Checkbox(checked = muteOutsideSchedule, onCheckedChange = { muteOutsideSchedule = it })
-
-                    Spacer(Modifier.width(16.dp))
-
-                    Column {
-
-                        Text("Mute notifications outside schedule", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                        Text("Silently deletes notifications from the tray outside the active time window (Focus Mode).", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-
-                    }
-
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { vibrationOnly = !vibrationOnly }.padding(vertical = 8.dp)) {
-
-                    Switch(checked = vibrationOnly, onCheckedChange = { vibrationOnly = it })
-
-                    Spacer(Modifier.width(16.dp))
-
-                    Column {
-
-                        Text("Vibration Only Mode", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-                        Text("If enabled, audio alarms will not play.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-
-                    }
-
-                }
-
-                Spacer(Modifier.height(32.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.White.copy(alpha = 0.7f)) }
-
-                    Spacer(Modifier.width(12.dp))
-
-                    Button(
-
-                        onClick = { onSave(editingRule?.id, targetPackage, keyword, startTimeMinute, endTimeMinute, vibrationOnly, isActive, activeDays, hasCustomTimeWindows, customTimeWindows, muteOutsideSchedule, remindSchedule) },
-
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF00)),
-
-                        shape = RoundedCornerShape(24.dp),
-
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-
-                    ) { 
-
-                        Text("Save Rule", fontWeight = FontWeight.Bold) 
-
-                    }
-
-                }
-
             }
-
         }
-
     }
-
 }
 
-@Preview(showBackground = true)
 
-@Composable
-
-fun EngineStatusCardPreview() {
-
-    MaterialTheme {
-
-        EngineStatusCard(isActive = true, onToggle = {})
-
-    }
-
-}
-
-@Preview(showBackground = true)
-
-@Composable
-
-fun RuleCardPreview() {
-
-    MaterialTheme {
-
-        RuleCard(
-
-            rule = AlarmRule(
-
-                id = "1",
-
-                targetPackage = "Messenger",
-
-                keyword = "Emergency",
-
-                startTimeMinute = 480,
-
-                endTimeMinute = 1200,
-
-                vibrationOnly = false,
-
-                isActive = true,
-
-                activeDays = setOf(1, 2, 3, 4, 5, 6, 7)
-
-            ),
-
-            onDelete = {},
-
-            onEdit = {},
-
-            onToggleActive = {}
-
-        )
-
-    }
-
-}
-
-@Preview(showBackground = true)
-
-@Composable
-
-fun AddRuleDialogPreview() {
-
-    MaterialTheme {
-
-        AddRuleDialog(
-
-            editingRule = null,
-
-            onDismiss = {},
-
-            onSave = { _, _, _, _, _, _, _, _, _, _, _, _ -> }
-        )
-
-    }
-
-}
-
-@Composable
-
-fun TimePickerDialog(
-
-    title: String = "Select Time",
-
-    onCancel: () -> Unit,
-
-    onConfirm: () -> Unit,
-
-    toggle: @Composable () -> Unit = {},
-
-    content: @Composable () -> Unit,
-
-) {
-
-    Dialog(
-
-        onDismissRequest = onCancel,
-
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-
-    ) {
-
-        Surface(
-
-            shape = MaterialTheme.shapes.extraLarge,
-
-            tonalElevation = 6.dp,
-
-            modifier = Modifier
-
-                .width(IntrinsicSize.Min)
-
-                .height(IntrinsicSize.Min)
-
-                .background(
-
-                    shape = MaterialTheme.shapes.extraLarge,
-
-                    color = MaterialTheme.colorScheme.background
-
-                ),
-
-        ) {
-
-            Column(
-
-                modifier = Modifier.padding(24.dp),
-
-                horizontalAlignment = Alignment.CenterHorizontally
-
-            ) {
-
-                Text(
-
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-
-                    text = title,
-
-                    style = MaterialTheme.typography.labelMedium
-
-                )
-
-                content()
-
-                Row(modifier = Modifier.height(40.dp).fillMaxWidth()) {
-
-                    toggle()
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    TextButton(onClick = onCancel) { Text("Cancel") }
-
-                    TextButton(onClick = onConfirm) { Text("OK") }
-
-                }
-
-            }
-
-        }
-
-    }
-
-}

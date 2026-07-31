@@ -34,10 +34,11 @@ import com.example.notivib.framework.service.InterceptorService
 import com.example.notivib.framework.utils.BatteryOptimizationHelper
 import com.example.notivib.presentation.rules_list.NotificationLogScreen
 import com.example.notivib.presentation.rules_list.RulesListScreen
-enum class Destination {
-    RulesList,
-    Logs,
-    Settings
+enum class Destination {
+    RulesList,
+    Logs,
+    Settings,
+    EditRule
 }
 fun checkNotificationAccess(context: Context): Boolean {
     return try {
@@ -75,14 +76,26 @@ fun AppNavigation() {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     if (hasNotificationAccess && hasPostNotificationPermission) {
-        var currentDestination by remember { mutableStateOf(Destination.RulesList) }
+        var currentDestination by remember { mutableStateOf(Destination.RulesList) }
+        var editingRule: com.example.notivib.domain.model.AlarmRule? by remember { mutableStateOf(null) }
         when (currentDestination) {
-            Destination.RulesList -> RulesListScreen(
-                onNavigateToLogs = { currentDestination = Destination.Logs },
-                onNavigateToSettings = { currentDestination = Destination.Settings }
+            Destination.RulesList -> RulesListScreen(
+                onNavigateToLogs = { currentDestination = Destination.Logs },
+                onNavigateToSettings = { currentDestination = Destination.Settings },
+                onNavigateToEditRule = { rule ->
+                    editingRule = rule
+                    currentDestination = Destination.EditRule
+                }
             )
             Destination.Logs -> NotificationLogScreen(onNavigateBack = { currentDestination = Destination.RulesList })
-            Destination.Settings -> com.example.notivib.presentation.settings.SettingsScreen(onNavigateBack = { currentDestination = Destination.RulesList })
+            Destination.Settings -> com.example.notivib.presentation.settings.SettingsScreen(
+                onNavigateBack = { currentDestination = Destination.RulesList },
+                onNavigateToLogs = { currentDestination = Destination.Logs }
+            )
+            Destination.EditRule -> com.example.notivib.presentation.rules_list.EditRuleScreen(
+                rule = editingRule,
+                onNavigateBack = { currentDestination = Destination.RulesList }
+            )
         }
     } else {
         PermissionsScreen(
@@ -198,3 +211,4 @@ fun PermissionsScreenPreview() {
         )
     }
 }
+

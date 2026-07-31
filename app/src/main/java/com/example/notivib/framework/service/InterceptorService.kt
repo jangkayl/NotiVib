@@ -101,7 +101,7 @@ class InterceptorService : NotificationListenerService() {
                 when (evaluationResult) {
                     is com.example.notivib.domain.usecase.EvaluationResult.TriggerAlarm -> {
                         if (!ActiveAlarmService.isAlarmRunning) {
-                            triggerAlarm(appName.ifEmpty { packageName }, evaluationResult.rule.keyword.ifEmpty { "Any" }, evaluationResult.rule.vibrationOnly)
+                            triggerAlarm(appName.ifEmpty { packageName }, evaluationResult.rule.keyword.ifEmpty { "Any" }, evaluationResult.rule.vibrationOnly, evaluationResult.rule.ruleName)
                         }
                     }
                     is com.example.notivib.domain.usecase.EvaluationResult.Mute -> {
@@ -118,12 +118,13 @@ class InterceptorService : NotificationListenerService() {
         }
     }
 
-    private fun triggerAlarm(appName: String, keyword: String, vibrationOnly: Boolean) {
+    private fun triggerAlarm(appName: String, keyword: String, vibrationOnly: Boolean, ruleName: String) {
         val intent = Intent(this, ActiveAlarmService::class.java).apply {
             action = ActiveAlarmService.ACTION_START
             putExtra("APP_NAME", appName)
             putExtra("KEYWORD", keyword)
             putExtra("VIBRATION_ONLY", vibrationOnly)
+            putExtra("RULE_NAME", ruleName)
         }
         startForegroundService(intent)
     }

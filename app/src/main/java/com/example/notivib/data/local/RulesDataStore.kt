@@ -52,6 +52,7 @@ class RulesDataStore(private val context: Context) {
                 list.add(
                     AlarmRule(
                         id = obj.getString("id"),
+                        ruleName = obj.optString("ruleName", ""),
                         targetPackage = obj.getString("targetPackage"),
                         keyword = obj.getString("keyword"),
                         startTimeMinute = obj.getInt("startTimeMinute"),
@@ -91,6 +92,7 @@ class RulesDataStore(private val context: Context) {
         rules.forEach { rule ->
             val obj = JSONObject()
             obj.put("id", rule.id)
+            obj.put("ruleName", rule.ruleName)
             obj.put("targetPackage", rule.targetPackage)
             obj.put("keyword", rule.keyword)
             obj.put("startTimeMinute", rule.startTimeMinute)

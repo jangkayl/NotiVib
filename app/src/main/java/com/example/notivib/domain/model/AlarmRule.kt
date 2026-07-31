@@ -6,6 +6,7 @@ data class TimeWindow(val startTimeMinute: Int, val endTimeMinute: Int)
 
 data class AlarmRule(
     val id: String = UUID.randomUUID().toString(),
+    val ruleName: String = "",
     val targetPackage: String,
     val keyword: String,
     val startTimeMinute: Int,

@@ -51,6 +51,7 @@ class RulesListViewModel @Inject constructor(
 
     fun saveRule(
         id: String?, 
+        ruleName: String = "",
         targetPackage: String, 
         keyword: String, 
         startTimeMinute: Int, 
@@ -68,6 +69,7 @@ class RulesListViewModel @Inject constructor(
             saveRuleUseCase(
                 AlarmRule(
                     id = ruleId,
+                    ruleName = ruleName,
                     targetPackage = targetPackage,
                     keyword = keyword,
                     startTimeMinute = startTimeMinute,
