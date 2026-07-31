@@ -65,13 +65,20 @@ class RulesListViewModel @Inject constructor(
         remindSchedule: Boolean = false
     ) {
         val ruleId = id ?: java.util.UUID.randomUUID().toString()
+        val deduplicatedKeyword = keyword
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinctBy { it.lowercase() }
+            .joinToString(",")
+
         viewModelScope.launch {
             saveRuleUseCase(
                 AlarmRule(
                     id = ruleId,
                     ruleName = ruleName,
                     targetPackage = targetPackage,
-                    keyword = keyword,
+                    keyword = deduplicatedKeyword,
                     startTimeMinute = startTimeMinute,
                     endTimeMinute = endTimeMinute,
                     vibrationOnly = vibrationOnly,
