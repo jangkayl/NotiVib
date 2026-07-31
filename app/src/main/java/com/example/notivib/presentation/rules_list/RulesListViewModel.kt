@@ -62,7 +62,8 @@ class RulesListViewModel @Inject constructor(
         hasCustomTimeWindows: Boolean = false,
         customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
         muteOutsideSchedule: Boolean = false,
-        remindSchedule: Boolean = false
+        remindSchedule: Boolean = false,
+        ignoredKeywords: String = ""
     ) {
         val ruleId = id ?: java.util.UUID.randomUUID().toString()
         val deduplicatedKeyword = keyword
@@ -87,7 +88,8 @@ class RulesListViewModel @Inject constructor(
                     hasCustomTimeWindows = hasCustomTimeWindows,
                     customTimeWindows = customTimeWindows,
                     muteOutsideSchedule = muteOutsideSchedule,
-                    remindSchedule = remindSchedule
+                    remindSchedule = remindSchedule,
+                    ignoredKeywords = ignoredKeywords
                 )
             )
             triggerEvaluation()

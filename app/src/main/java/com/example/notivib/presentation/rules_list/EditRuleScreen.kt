@@ -49,6 +49,7 @@ fun EditRuleScreen(
     var vibrationOnly by remember { mutableStateOf(rule?.vibrationOnly ?: false) }
     var muteOutsideSchedule by remember { mutableStateOf(rule?.muteOutsideSchedule ?: false) }
     var remindSchedule by remember { mutableStateOf(rule?.remindSchedule ?: false) }
+    var ignoredKeywords by remember { mutableStateOf(rule?.ignoredKeywords ?: "") }
 
     var hasCustomTimeWindows by remember { mutableStateOf(rule?.hasCustomTimeWindows ?: false) }
     var customTimeWindows by remember {
@@ -86,7 +87,7 @@ fun EditRuleScreen(
 
     val hasUnsavedChanges = remember(
         ruleName, keyword, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule, 
-        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute
+        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, ignoredKeywords
     ) {
         ruleName != (rule?.ruleName ?: "") ||
         keyword != (rule?.keyword ?: "") ||
@@ -95,6 +96,7 @@ fun EditRuleScreen(
         vibrationOnly != (rule?.vibrationOnly ?: false) ||
         muteOutsideSchedule != (rule?.muteOutsideSchedule ?: false) ||
         remindSchedule != (rule?.remindSchedule ?: false) ||
+        ignoredKeywords != (rule?.ignoredKeywords ?: "") ||
         hasCustomTimeWindows != (rule?.hasCustomTimeWindows ?: false) ||
         customTimeWindows != (rule?.customTimeWindows ?: emptyMap<Int, com.example.notivib.domain.model.TimeWindow>()) ||
         startTimeMinute != (rule?.startTimeMinute ?: 0) ||
@@ -244,7 +246,8 @@ fun EditRuleScreen(
                             hasCustomTimeWindows = hasCustomTimeWindows,
                             customTimeWindows = customTimeWindows,
                             muteOutsideSchedule = muteOutsideSchedule,
-                            remindSchedule = remindSchedule
+                            remindSchedule = remindSchedule,
+                            ignoredKeywords = ignoredKeywords
                         )
                         onNavigateBack()
                     },
@@ -310,6 +313,33 @@ fun EditRuleScreen(
                     focusedTextColor = accentColor,
                     unfocusedTextColor = accentColor
                 )
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Text("Ignored Keywords (Comma Separated)", color = Color.White, fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ignoredKeywords,
+                onValueChange = { ignoredKeywords = it },
+                placeholder = { Text("e.g. 429, timeout, scheduled", color = Color.Gray, fontFamily = HostGrotesk) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = darkSurface,
+                    unfocusedContainerColor = darkSurface,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = accentColor,
+                    unfocusedTextColor = accentColor
+                )
+            )
+            Text(
+                "Notifications containing these words will be skipped even if they match trigger keywords.",
+                fontFamily = HostGrotesk,
+                color = textColor,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp)
             )
 
             Spacer(Modifier.height(24.dp))

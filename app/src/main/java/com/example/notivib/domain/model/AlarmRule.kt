@@ -17,5 +17,6 @@ data class AlarmRule(
     val hasCustomTimeWindows: Boolean = false,
     val customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
     val muteOutsideSchedule: Boolean = false,
-    val remindSchedule: Boolean = false
+    val remindSchedule: Boolean = false,
+    val ignoredKeywords: String = ""
 )

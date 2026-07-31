@@ -31,48 +31,53 @@ class EvaluateNotificationUseCase @Inject constructor(
                            packageName.contains(rule.targetPackage, ignoreCase = true) ||
                            appName.contains(rule.targetPackage, ignoreCase = true))
 
+            if (!matchApp) continue
+
             if (!rule.activeDays.contains(currentDay)) {
-                if (rule.muteOutsideSchedule && matchApp && !isAnyApp) {
+                if (rule.muteOutsideSchedule && !isAnyApp) {
                     pendingMute = EvaluationResult.Mute(rule)
                 }
                 continue
             }
 
-            val keywords = rule.keyword.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            val matchKeyword = keywords.isEmpty() || keywords.any { kw ->
-                title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
+            val startMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
+                rule.customTimeWindows[currentDay]!!.startTimeMinute
+            } else {
+                rule.startTimeMinute
             }
 
-            if (matchApp && matchKeyword) {
-                val startMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
-                    rule.customTimeWindows[currentDay]!!.startTimeMinute
-                } else {
-                    rule.startTimeMinute
-                }
+            val endMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
+                rule.customTimeWindows[currentDay]!!.endTimeMinute
+            } else {
+                rule.endTimeMinute
+            }
 
-                val endMinute = if (rule.hasCustomTimeWindows && rule.customTimeWindows.containsKey(currentDay)) {
-                    rule.customTimeWindows[currentDay]!!.endTimeMinute
-                } else {
-                    rule.endTimeMinute
-                }
+            val isWithinTime = if (startMinute == 0 && endMinute == 1440) {
+                true
+            } else if (startMinute < endMinute) {
+                currentMinutes in startMinute..endMinute
+            } else if (startMinute > endMinute) {
+                currentMinutes >= startMinute || currentMinutes <= endMinute
+            } else {
+                true
+            }
 
-                val isWithinTime = if (startMinute == 0 && endMinute == 1440) {
-                    true
-                } else if (startMinute < endMinute) {
-                    currentMinutes in startMinute..endMinute
-                } else if (startMinute > endMinute) {
-                    currentMinutes >= startMinute || currentMinutes <= endMinute
-                } else {
-                    true
+            if (isWithinTime) {
+                val keywords = rule.keyword.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                val matchKeyword = keywords.isEmpty() || keywords.any { kw ->
+                    title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
                 }
-
-                if (isWithinTime) {
-                    if (matchKeyword) {
+                if (matchKeyword) {
+                    val ignored = rule.ignoredKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    val isIgnored = ignored.any { ik ->
+                        title.contains(ik, ignoreCase = true) || text.contains(ik, ignoreCase = true)
+                    }
+                    if (!isIgnored) {
                         return EvaluationResult.TriggerAlarm(rule)
                     }
-                } else if (rule.muteOutsideSchedule && matchApp) {
-                    pendingMute = EvaluationResult.Mute(rule)
                 }
+            } else if (rule.muteOutsideSchedule && !isAnyApp) {
+                pendingMute = EvaluationResult.Mute(rule)
             }
         }
         

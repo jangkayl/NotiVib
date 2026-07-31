@@ -1,79 +1,127 @@
-# NotiVib - UI/UX Design System & Guidelines
+# NotiVib — UI/UX Design System & Guidelines
 
-This document serves as the single source of truth for NotiVib's user interface and user experience design, based on the approved design mockups.
+This document serves as the single source of truth for NotiVib's user interface and user experience design.
+
+---
 
 ## 1. Core Visual Identity
 
 ### 1.1 Color Palette
-The app uses a dark-mode-first aesthetic with a highly vibrant, high-contrast neon green accent to create a "premium hacker/utility" vibe.
+The app uses a dark-mode-first aesthetic with a vibrant neon green accent.
 
-*   **Primary Accent (Neon Green):** `#D9FF0B` - Used for primary actions, active states, active toggles, FABs, and primary buttons.
-*   **Secondary/Pale Accent:** `#D9EA7D` - Used for secondary buttons (e.g., Cancel in modals) or subtle text accents.
-*   **Danger/Destructive:** `#FF0B0B` - Used for delete buttons, error states, and destructive modal actions.
-*   **Background (Dark Gray 1):** `#20201E` - The deepest background color, used for the main app scaffolding.
-*   **Surface 1 (Dark Gray 2):** `#5B5B5B` - Used for borders, dividers, or elevated surfaces.
-*   **Surface 2 (Dark Gray 3):** `#444444` - Used for cards (e.g., inactive rule cards, settings cards, text fields).
-*   **Surface 3 (Dark Gray 4):** `#5E5E5E` - Used for lighter elevated components or disabled states.
+| Token | Hex | Usage |
+|-------|-----|-------|
+| **Primary Accent** | `#D9FF0B` | Primary buttons, active toggles, FAB, active day circles, text field values, switch tracks |
+| **Background** | `#20201E` | Main app scaffolding, deepest background |
+| **Surface (Input Fields)** | `#5B5B5B` | Text field backgrounds, time picker buttons, day circle inactive state |
+| **Surface (Cards)** | `#444444` | Rule cards (inactive), settings cards, notification log cards |
+| **Danger** | `#FF0B0B` | Delete buttons, error states, destructive actions |
+| **Text Primary** | `#FFFFFF` | Headings, labels, primary text |
+| **Text Secondary** | `#E0E0E0` | Body text, descriptions, helper text |
+| **Text Muted** | `Color.Gray` | Placeholders, package names |
 
 ### 1.2 Typography
-We use a combination of serif and sans-serif fonts to create a modern, structured look.
-*   **Google Fonts:** Enabled via Compose.
-*   **Host Grotesk:** Primary font for Body, Labels, and general UI elements.
-*   **Source Serif 4:** Secondary font, used for the App Title/Branding and highly stylized headings.
+Two font families are used throughout the app:
+
+| Font | Usage |
+|------|-------|
+| **Source Serif 4** | App title, screen titles, button labels, rule names, headings, time values |
+| **Host Grotesk** | Body text, form labels, descriptions, helper text, placeholders |
 
 ### 1.3 Iconography
-Icons are primarily sourced from Material Symbols. Key icons explicitly requested:
-*   `mop` (Cleaning/Clearing history)
-*   `list_alt_add` (Adding to list/history)
-*   `ecg_heart` or `monitor_heart` (Engine status/health)
-*   `arrow_back_ios_new` (Standard back navigation)
+Icons sourced from Material Symbols and custom vector icons:
+
+| Icon | Usage |
+|------|-------|
+| `mop` | Clear history |
+| `list_alt_add` | Add to log/history |
+| `ecg_heart` | Engine diagnostics |
+| `arrow_back_ios_new` | Back navigation |
+| `Icons.Outlined.Delete` | Delete rule (red tint) |
+| `Icons.Outlined.Search` | App search in selector |
+| `Icons.Outlined.Apps` | "Any App" target |
+| `Icons.Outlined.ArrowDropDown` | App selector expand |
+| `Icons.Outlined.Settings` | Navigate to settings |
+| `Icons.Outlined.Security` | Permissions screen icon |
+
+### 1.4 Shape System
+| Element | Corner Radius |
+|---------|--------------|
+| Cards | `20dp` rounded |
+| Text fields | `12dp` rounded |
+| Buttons (primary) | `16dp` rounded |
+| Settings buttons | `24dp` rounded |
+| Day circles | `CircleShape` |
+| Dialogs | `24dp` rounded |
+| App selector dialog | `24dp` rounded |
 
 ---
 
 ## 2. Screen & Component Architecture
 
-### 2.1 Homepage (Active / Inactive)
-*   **Top App Bar:** Brand logo/text on the left. `ecg_heart` (Diagnostics) and Settings gear on the right.
-*   **Navigation:** A full-width segmented control (Pill shape) to toggle between "Active" and "Inactive" rules. Active segment uses `#D9FF0B`.
-*   **Rule Cards:**
-    *   **Active Rule:** Bright background (Primary/Secondary Accent), dark text.
-    *   **Inactive Rule:** Dark Gray (`#444444`) background, white/light text.
-    *   **Contents:** App Icon + Name, Package name, Trigger Keywords, Active Days (M, T, W, Th, F, S, Su), Status Chip, and a 3-dot overflow menu.
-*   **FAB:** "+ New Rule" extended floating action button pinned to the bottom right (`#D9FF0B`).
+### 2.1 Permissions Screen (Onboarding)
+Shown when required permissions are missing. Blocks access to the main app until granted.
+- Centered layout with security icon, welcome text, and description.
+- Permission cards for: System Notifications, Battery Optimization, Notification Interception.
+- Each card has icon, title, description, and forward arrow. Tapping opens the relevant system settings.
 
-### 2.2 Edit / Create Rule Screen
-*   **Top App Bar:** `arrow_back_ios_new`, "Edit Rule" title, and a Red Delete icon (if editing an existing rule).
-*   **Form Elements:**
-    *   **Keywords:** A large text area (`#444444` background) for comma-separated trigger keywords.
-    *   **Target Application:** A dropdown selector with the app icon and name.
-    *   **Active Days:** A horizontal row of 7 circular toggles (M-Su). Active state is `#D9FF0B`, inactive state is `#5E5E5E`.
-*   **Bottom Bar:** "Cancel" text button and a prominent "Save Rule" filled button (`#D9FF0B`).
+### 2.2 Rules List Screen (Homepage)
+- **Top App Bar**: Brand text on left. Diagnostics (`ecg_heart`) and Settings (`gear`) icons on right.
+- **Tab Navigation**: Full-width `TabRow` with "Active (N)" and "Inactive (N)" tabs. Selected tab uses primary accent color.
+- **Rule Cards**:
+  - Display: App icon, app name, package name, rule name, trigger keywords, active days (M/T/W/Th/F/S/Su circles), status indicators.
+  - Active rules: Bright accent background with dark text.
+  - Inactive rules: Dark surface (`#444444`) background with light text.
+  - Tap to navigate to EditRuleScreen.
+  - Toggle switch to enable/disable without opening editor.
+- **FAB**: Extended "New Rule" floating action button (`#D9FF0B`), bottom-right.
+- **Empty State**: Centered message when no rules exist in the current tab.
 
-### 2.3 Modals & Dialogs
-*   **Delete Rule Modal:**
-    *   Dark background (`#20201E` or `#444444`).
-    *   Clear Title and descriptive warning text.
-    *   "Cancel" button (`#D9EA7D`) and "Delete" button (`#FF0B0B`).
-*   **Engine Diagnostics Modal:**
-    *   Appears as an overlay/bottom sheet.
-    *   "Engine Diagnostics" title with a download/export icon.
-    *   Terminal/Log window area.
-    *   Full-width "Dismiss" button (`#D9FF0B`) at the bottom.
+### 2.3 Edit / Create Rule Screen
+- **Top App Bar**: Back arrow, "Edit Rule" or "New Rule" title, red Delete icon (edit mode only).
+- **Form Fields** (scrollable):
+  1. **Rule Name** — Text field with placeholder "e.g. Work Rule"
+  2. **Trigger Keywords** — Text field for comma-separated keywords with placeholder "e.g. URGENT, Boss, Emergency"
+  3. **Ignored Keywords** — Text field for comma-separated exclusion keywords with placeholder "e.g. 429, timeout, scheduled". Helper text: "Notifications containing these words will be skipped even if they match trigger keywords."
+  4. **Target Application** — Card-style selector showing app icon, name, and package. Tapping opens full-screen dialog with search bar and scrollable app list. "ALL APPLICATIONS" option at top.
+  5. **Active Days** — Row of 7 circular toggles (M, T, W, Th, F, S, Su). Active: `#D9FF0B` with black text. Inactive: `#5B5B5B` with white text. Minimum 1 day must remain selected.
+  6. **Custom Schedule Per Day** — Checkbox to enable per-day time windows. When disabled: single global Start/End time picker. When enabled: per-day rows with individual start/end time buttons.
+  7. **Remind When Schedule Starts/Ends** — Checkbox option.
+  8. **Mute Notifications Outside Schedule** — Checkbox option. Silently deletes notifications from the target app outside the active window.
+  9. **Vibration Only Mode** — Switch toggle. Disables audio alarm.
+- **Bottom Bar**: "Cancel" text button + "Save Rule" filled button (`#D9FF0B`).
+- **Unsaved Changes Dialog**: Warns before navigating away with unsaved edits. "Keep Editing" (accent) / "Discard" (red) buttons.
+- **Delete Confirmation Dialog**: "Delete Rule?" with warning text. "Cancel" (accent) / "Delete" (red) buttons.
+- **Time Picker Dialogs**: Dark themed (`#161618` surface), 24-hour format, accent-colored selector and confirm button.
 
 ### 2.4 Settings Screen
-*   **Top App Bar:** `arrow_back_ios_new`, "Settings" title.
-*   **Settings Cards:** Rounded cards (`#444444`) grouping related settings.
-    *   **Toggles:** "Engine Active" and "Persistent Notification" with standard Material switches (track is `#D9FF0B` when active).
-    *   **Permissions:** Prominent warning text/cards for missing permissions. Full-width buttons inside the cards: "Grant Permission" and "Allow Background Usage" (`#D9FF0B`).
-    *   **Navigation:** A full-width "Notification History" button at the bottom of the scrollable list.
+- **Top App Bar**: Back arrow, "Settings" title.
+- **Engine Status Card**: Status indicator dot (green=active, red=suspended), "Engine Active"/"Engine Suspended" text, toggle switch.
+- **Persistent Notification Card**: Toggle to keep foreground notification visible.
+- **Permission Cards** (shown conditionally when permissions are missing):
+  - Display Over Other Apps — Full-width "Grant Permission" button.
+  - Battery Optimization — Full-width "Allow Background Usage" button.
+- **Notification History Button**: Full-width accent button at bottom of screen.
 
 ### 2.5 Notification History Screen
-*   **Top App Bar:** `arrow_back_ios_new`, "Notification History" title. Action icons: `list_alt_add` and `mop` on the right.
-*   **List Items:** Simple, rounded rectangular cards (`#444444` background) stacked vertically.
+- **Top App Bar**: Back arrow, "Notification History" title. Action icons: `list_alt_add` (toggle tracked apps) and `mop` (clear history) on right.
+- **Tab Navigation**: "Intercept Log" and "System Log" tabs.
+- **List Items**: Rounded cards (`#444444`) showing app name, title, text, timestamp, and matched rule info.
+- **Swipe-to-delete**: Individual log entries can be dismissed.
+
+### 2.6 Alarm Activity (Full-Screen)
+- Full-screen overlay displaying alarm information (app name, keyword, rule name).
+- "Dismiss" button to stop the alarm.
+- Works with screen off via `FLAG_SHOW_WHEN_LOCKED` and `FLAG_TURN_SCREEN_ON`.
 
 ---
 
 ## 3. Interaction & UX Guidelines
-*   **Contrast is Key:** Ensure text on the neon green (`#D9FF0B`) background is dark (e.g., `#20201E`) for maximum readability.
-*   **Feedback:** All interactive elements (buttons, cards, toggles) should have ripple effects and clear visual state changes.
-*   **Destructive Actions:** Always protect destructive actions (like deleting a rule) behind a confirmation modal, and style the final action in pure Red (`#FF0B0B`).
+
+- **Contrast**: Text on neon green (`#D9FF0B`) background must be dark (`#20201E` or `Color.Black`).
+- **Feedback**: All interactive elements have ripple effects and clear visual state changes.
+- **Destructive Actions**: Protected behind confirmation dialogs. Final action styled in red (`#FF0B0B`).
+- **Unsaved Changes**: Back navigation from edit screen warns if there are unsaved changes.
+- **Minimum Constraints**: At least 1 active day must remain selected when toggling day circles.
+- **Consistent Spacing**: `24dp` between major sections, `8dp` between labels and their fields, `16dp` between option rows.
+- **Clickable Rows**: Checkbox/switch rows are fully clickable (not just the control itself).

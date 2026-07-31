@@ -1,10 +1,8 @@
 package com.example.notivib.framework.receiver
 
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import com.example.notivib.domain.manager.ScheduleManager
 import com.example.notivib.domain.repository.RuleRepository
 import com.example.notivib.framework.service.EngineForegroundService
