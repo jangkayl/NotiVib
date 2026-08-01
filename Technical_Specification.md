@@ -30,8 +30,8 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 - **Use Cases**:
   - `EvaluateNotificationUseCase` — Core evaluation engine. Checks incoming notifications against all active rules. Returns `TriggerAlarm`, `Mute`, or `Ignore`. Supports:
     - Per-app or "ANY" app targeting
-    - Comma-separated trigger keyword matching (title + text)
-    - Comma-separated ignored keyword exclusion
+    - Trigger keyword chip/tag matching (title + text) with delimiter-aware parsing (`|||` delimiter, `,` legacy fallback)
+    - Ignored keyword chip/tag exclusion (`|||` delimiter, `,` legacy fallback)
     - Time window evaluation (including overnight spans)
     - Custom per-day time windows
     - Active day filtering

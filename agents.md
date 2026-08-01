@@ -85,7 +85,7 @@ data class AlarmRule(
     val endTimeMinute: Int,
     val vibrationOnly: Boolean,
     val isActive: Boolean,
-    val activeDays: Set<Int>,        // 1=Sunday, 2=Monday, ..., 7=Saturday
+    val activeDays: Set<Int>,        // 1=Monday, 2=Tuesday, ..., 7=Sunday
     val hasCustomTimeWindows: Boolean,
     val customTimeWindows: Map<Int, TimeWindow>,
     val muteOutsideSchedule: Boolean,

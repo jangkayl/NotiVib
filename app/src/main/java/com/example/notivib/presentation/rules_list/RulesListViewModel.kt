@@ -66,12 +66,13 @@ class RulesListViewModel @Inject constructor(
         ignoredKeywords: String = ""
     ) {
         val ruleId = id ?: java.util.UUID.randomUUID().toString()
-        val deduplicatedKeyword = keyword
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+        val deduplicatedKeyword = com.example.notivib.domain.model.parseKeywords(keyword)
             .distinctBy { it.lowercase() }
-            .joinToString(",")
+            .joinToString("|||")
+
+        val deduplicatedIgnored = com.example.notivib.domain.model.parseKeywords(ignoredKeywords)
+            .distinctBy { it.lowercase() }
+            .joinToString("|||")
 
         viewModelScope.launch {
             saveRuleUseCase(
@@ -89,7 +90,7 @@ class RulesListViewModel @Inject constructor(
                     customTimeWindows = customTimeWindows,
                     muteOutsideSchedule = muteOutsideSchedule,
                     remindSchedule = remindSchedule,
-                    ignoredKeywords = ignoredKeywords
+                    ignoredKeywords = deduplicatedIgnored
                 )
             )
             triggerEvaluation()
@@ -99,6 +100,14 @@ class RulesListViewModel @Inject constructor(
             if (savedRule != null) {
                 ScheduleReminderManager.scheduleForRule(context, savedRule)
             }
+        }
+    }
+
+    fun saveRule(rule: AlarmRule) {
+        viewModelScope.launch {
+            saveRuleUseCase(rule)
+            triggerEvaluation()
+            ScheduleReminderManager.scheduleForRule(context, rule)
         }
     }
 
