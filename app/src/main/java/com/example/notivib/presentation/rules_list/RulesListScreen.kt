@@ -77,6 +77,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.rotate
 
 import androidx.compose.ui.graphics.Color
 
@@ -329,14 +330,97 @@ fun RulesListScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { onNavigateToEditRule(null) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.background,
-                shape = RoundedCornerShape(24.dp),
-                icon = { Icon(Icons.Outlined.Add, contentDescription = "Add Rule", tint = MaterialTheme.colorScheme.background) },
-                text = { Text("New Rule", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold) }
-            )
+            var showFabMenu by remember { mutableStateOf(false) }
+            val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+            
+            Box(contentAlignment = Alignment.BottomEnd) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showFabMenu,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { 50 }),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(targetOffsetY = { 50 })
+                ) {
+                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 80.dp)) {
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                showFabMenu = false
+                                onNavigateToEditRule(null)
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            icon = { Icon(Icons.Outlined.Edit, contentDescription = "Manual") },
+                            text = { Text("Create Manually", fontWeight = FontWeight.Bold) },
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                showFabMenu = false
+                                val clipboardText = clipboardManager.getText()?.text
+                                if (!clipboardText.isNullOrBlank()) {
+                                    try {
+                                        val obj = org.json.JSONObject(clipboardText)
+                                        val newRule = com.example.notivib.domain.model.AlarmRule(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            ruleName = obj.optString("ruleName", ""),
+                                            targetPackage = obj.getString("targetPackage"),
+                                            keyword = obj.getString("keyword"),
+                                            startTimeMinute = obj.getInt("startTimeMinute"),
+                                            endTimeMinute = obj.getInt("endTimeMinute"),
+                                            vibrationOnly = obj.optBoolean("vibrationOnly", false),
+                                            isActive = obj.optBoolean("isActive", true),
+                                            activeDays = obj.optJSONArray("activeDays")?.let { arr ->
+                                                val days = mutableSetOf<Int>()
+                                                for (j in 0 until arr.length()) days.add(arr.getInt(j))
+                                                days
+                                            } ?: setOf(1, 2, 3, 4, 5, 6, 7),
+                                            muteOutsideSchedule = obj.optBoolean("muteOutsideSchedule", false),
+                                            remindSchedule = obj.optBoolean("remindSchedule", false),
+                                            ignoredKeywords = obj.optString("ignoredKeywords", ""),
+                                            hasCustomTimeWindows = obj.optBoolean("hasCustomTimeWindows", false),
+                                            customTimeWindows = obj.optJSONObject("customTimeWindows")?.let { customWindowsObj ->
+                                                val map = mutableMapOf<Int, com.example.notivib.domain.model.TimeWindow>()
+                                                val keys = customWindowsObj.keys()
+                                                while (keys.hasNext()) {
+                                                    val key = keys.next()
+                                                    val windowObj = customWindowsObj.getJSONObject(key)
+                                                    map[key.toInt()] = com.example.notivib.domain.model.TimeWindow(
+                                                        startTimeMinute = windowObj.getInt("startTimeMinute"),
+                                                        endTimeMinute = windowObj.getInt("endTimeMinute")
+                                                    )
+                                                }
+                                                map
+                                            } ?: emptyMap()
+                                        )
+                                        onNavigateToEditRule(newRule)
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(context, "Invalid rule JSON on clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    android.widget.Toast.makeText(context, "Clipboard is empty", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = "Paste") },
+                            text = { Text("Paste Copied Rule", fontWeight = FontWeight.Bold) }
+                        )
+                    }
+                }
+
+                FloatingActionButton(
+                    onClick = { showFabMenu = !showFabMenu },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.background,
+                    shape = CircleShape,
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    val rotation by androidx.compose.animation.core.animateFloatAsState(targetValue = if (showFabMenu) 45f else 0f)
+                    Icon(
+                        Icons.Filled.Add, 
+                        contentDescription = "Add Rule", 
+                        modifier = Modifier.size(36.dp).rotate(rotation)
+                    )
+                }
+            }
         },
     ) { padding ->
 
@@ -675,6 +759,7 @@ fun EngineStatusCard(isActive: Boolean, onToggle: (Boolean) -> Unit) {
 @Composable
 fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule) -> Unit, onToggleActive: (Boolean) -> Unit) {
     val context = LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val cardBg = if (rule.isActive) Color(0xFFD9EA7D) else Color(0xFF444444)
@@ -785,6 +870,37 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
                                 onEdit(rule)
                             },
                             leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, tint = Color.White) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy Rule", color = Color.White) },
+                            onClick = {
+                                showMenu = false
+                                val json = org.json.JSONObject().apply {
+                                    put("ruleName", rule.ruleName)
+                                    put("targetPackage", rule.targetPackage)
+                                    put("keyword", rule.keyword)
+                                    put("startTimeMinute", rule.startTimeMinute)
+                                    put("endTimeMinute", rule.endTimeMinute)
+                                    put("vibrationOnly", rule.vibrationOnly)
+                                    put("isActive", rule.isActive)
+                                    put("muteOutsideSchedule", rule.muteOutsideSchedule)
+                                    put("remindSchedule", rule.remindSchedule)
+                                    put("ignoredKeywords", rule.ignoredKeywords)
+                                    put("activeDays", org.json.JSONArray(rule.activeDays))
+                                    put("hasCustomTimeWindows", rule.hasCustomTimeWindows)
+                                    val customWindowsObj = org.json.JSONObject()
+                                    rule.customTimeWindows.forEach { (day, window) ->
+                                        val windowObj = org.json.JSONObject()
+                                        windowObj.put("startTimeMinute", window.startTimeMinute)
+                                        windowObj.put("endTimeMinute", window.endTimeMinute)
+                                        customWindowsObj.put(day.toString(), windowObj)
+                                    }
+                                    put("customTimeWindows", customWindowsObj)
+                                }
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(json.toString(4)))
+                                android.widget.Toast.makeText(context, "Rule copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = Color.White) }
                         )
                         DropdownMenuItem(
                             text = { Text("Delete Rule", color = MaterialTheme.colorScheme.error) },

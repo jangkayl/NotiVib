@@ -103,6 +103,14 @@ class RulesListViewModel @Inject constructor(
         }
     }
 
+    fun saveRule(rule: AlarmRule) {
+        viewModelScope.launch {
+            saveRuleUseCase(rule)
+            triggerEvaluation()
+            ScheduleReminderManager.scheduleForRule(context, rule)
+        }
+    }
+
     fun toggleRuleActive(rule: AlarmRule, isActive: Boolean) {
         viewModelScope.launch {
             saveRuleUseCase(rule.copy(isActive = isActive))

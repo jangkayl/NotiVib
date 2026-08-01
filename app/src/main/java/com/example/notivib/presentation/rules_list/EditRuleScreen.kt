@@ -253,6 +253,19 @@ fun EditRuleScreen(
                 }
                 Button(
                     onClick = {
+                        val existingRules = viewModel.rules.value
+                        val isDuplicate = existingRules.any { it.ruleName.equals(ruleName, ignoreCase = true) && it.ruleName.isNotEmpty() && it.id != rule?.id }
+                        
+                        if (isDuplicate) {
+                            android.widget.Toast.makeText(context, "A rule with this name already exists", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        
+                        if (keywordChips.isEmpty()) {
+                            android.widget.Toast.makeText(context, "Please add at least one trigger keyword", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
                         viewModel.saveRule(
                             id = rule?.id,
                             ruleName = ruleName,
@@ -301,9 +314,10 @@ fun EditRuleScreen(
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = ruleName,
-                onValueChange = { ruleName = it },
+                onValueChange = { if (it.length <= 50) ruleName = it },
                 placeholder = { Text("e.g. Work Rule", color = Color.Gray, fontFamily = HostGrotesk) },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = darkSurface,

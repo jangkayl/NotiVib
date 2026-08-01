@@ -74,7 +74,8 @@ Shown when required permissions are missing. Blocks access to the main app until
   - Inactive rules: Dark surface (`#444444`) background with light text.
   - Tap to navigate to EditRuleScreen.
   - Toggle switch to enable/disable without opening editor.
-- **FAB**: Extended "New Rule" floating action button (`#D9FF0B`), bottom-right.
+  - Dropdown menu (⋮) options: "Edit Rule", "Copy Rule" (copies rule payload to clipboard as JSON), and "Delete Rule".
+- **FAB**: Large circular floating action button (`#D9FF0B`) with a `+` icon, bottom-right. When clicked, it animates (rotates 45 degrees) and expands an upward menu with two mini-FAB options: "Create Manually" and "Paste Copied Rule".
 - **Empty State**: Centered message when no rules exist in the current tab.
 
 ### 2.3 Edit / Create Rule Screen
