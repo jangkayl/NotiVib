@@ -451,7 +451,7 @@ fun EditRuleScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val daysOfWeek = listOf("M" to 2, "T" to 3, "W" to 4, "Th" to 5, "F" to 6, "S" to 7, "Su" to 1)
+                val daysOfWeek = listOf("M" to 1, "T" to 2, "W" to 3, "Th" to 4, "F" to 5, "S" to 6, "Su" to 7)
                 daysOfWeek.forEach { (label, day) ->
                     val isActive = activeDays.contains(day)
                     Box(
@@ -554,7 +554,7 @@ fun EditRuleScreen(
                     }
                 }
             } else {
-                val daysOfWeek = listOf(2 to "Monday", 3 to "Tuesday", 4 to "Wednesday", 5 to "Thursday", 6 to "Friday", 7 to "Saturday", 1 to "Sunday")
+                val daysOfWeek = listOf(1 to "Monday", 2 to "Tuesday", 3 to "Wednesday", 4 to "Thursday", 5 to "Friday", 6 to "Saturday", 7 to "Sunday")
                 daysOfWeek.forEach { (dayInt, dayName) ->
                     if (activeDays.contains(dayInt)) {
                         val dayWindow = customTimeWindows[dayInt] ?: com.example.notivib.domain.model.TimeWindow(0, 1439)
