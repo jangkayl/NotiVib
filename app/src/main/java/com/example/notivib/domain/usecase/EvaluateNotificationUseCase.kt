@@ -21,6 +21,7 @@ class EvaluateNotificationUseCase @Inject constructor(
         val currentMinutes = now.hour * 60 + now.minute
 
         var pendingMute: EvaluationResult.Mute? = null
+        var isAnyRuleActiveForApp = false
 
         for (rule in rules) {
             if (!rule.isActive) continue
@@ -63,6 +64,7 @@ class EvaluateNotificationUseCase @Inject constructor(
             }
 
             if (isWithinTime) {
+                isAnyRuleActiveForApp = true // Mark that the app has an active rule right now
                 val keywords = com.example.notivib.domain.model.parseKeywords(rule.keyword)
                 val matchKeyword = keywords.isEmpty() || keywords.any { kw ->
                     title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
@@ -79,6 +81,11 @@ class EvaluateNotificationUseCase @Inject constructor(
             } else if (rule.muteOutsideSchedule && !isAnyApp) {
                 pendingMute = EvaluationResult.Mute(rule)
             }
+        }
+        
+        // If ANY rule for this app is currently inside its active schedule, do not mute normal notifications
+        if (isAnyRuleActiveForApp) {
+            return EvaluationResult.Ignore
         }
         
         return pendingMute ?: EvaluationResult.Ignore

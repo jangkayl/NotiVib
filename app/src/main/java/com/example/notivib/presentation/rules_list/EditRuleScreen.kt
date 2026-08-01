@@ -254,10 +254,30 @@ fun EditRuleScreen(
                 Button(
                     onClick = {
                         val existingRules = viewModel.rules.value
-                        val isDuplicate = existingRules.any { it.ruleName.equals(ruleName, ignoreCase = true) && it.ruleName.isNotEmpty() && it.id != rule?.id }
+                        val isDuplicateName = existingRules.any { it.ruleName.equals(ruleName, ignoreCase = true) && it.ruleName.isNotEmpty() && it.id != rule?.id }
                         
-                        if (isDuplicate) {
+                        if (isDuplicateName) {
                             android.widget.Toast.makeText(context, "A rule with this name already exists", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        
+                        val isExactDuplicate = existingRules.any { 
+                            it.id != rule?.id &&
+                            it.targetPackage == targetPackage &&
+                            it.keyword == keywordChips.joinToString("|||") &&
+                            it.ignoredKeywords == ignoredKeywordChips.joinToString("|||") &&
+                            it.activeDays == activeDays &&
+                            it.startTimeMinute == startTimeMinute &&
+                            it.endTimeMinute == endTimeMinute &&
+                            it.vibrationOnly == vibrationOnly &&
+                            it.muteOutsideSchedule == muteOutsideSchedule &&
+                            it.remindSchedule == remindSchedule &&
+                            it.hasCustomTimeWindows == hasCustomTimeWindows &&
+                            it.customTimeWindows == customTimeWindows
+                        }
+                        
+                        if (isExactDuplicate) {
+                            android.widget.Toast.makeText(context, "An identical rule already exists for this app", android.widget.Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         
