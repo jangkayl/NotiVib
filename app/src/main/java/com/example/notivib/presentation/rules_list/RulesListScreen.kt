@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.*
 
 import androidx.compose.foundation.rememberScrollState
 
+import androidx.compose.foundation.horizontalScroll
+
 import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.BorderStroke
@@ -799,15 +801,56 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
             Spacer(Modifier.height(16.dp))
 
             Text("Keywords", style = MaterialTheme.typography.labelSmall, color = subTextColor, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = rule.keyword.replace(",", " • "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = textColor,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
+            Spacer(Modifier.height(6.dp))
+            val keywordsList = com.example.notivib.domain.model.parseKeywords(rule.keyword)
+            if (keywordsList.isEmpty()) {
+                Text(
+                    text = "Any Keyword",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                val displayLimit = 3
+                val visibleKeywords = keywordsList.take(displayLimit)
+                val overflowCount = keywordsList.size - visibleKeywords.size
+
+                com.example.notivib.presentation.components.SimpleFlowRow(
+                    horizontalSpacing = 6.dp,
+                    verticalSpacing = 6.dp
+                ) {
+                    visibleKeywords.forEach { kw ->
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFF333333),
+                            contentColor = Color(0xFFD9FF0B)
+                        ) {
+                            Text(
+                                text = kw,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    if (overflowCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFF333333),
+                            contentColor = Color(0xFFD9FF0B)
+                        ) {
+                            Text(
+                                text = "+$overflowCount more",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
 
             Spacer(Modifier.height(16.dp))
 

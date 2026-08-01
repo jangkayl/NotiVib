@@ -8,22 +8,29 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -42,14 +49,22 @@ fun EditRuleScreen(
 ) {
     val context = LocalContext.current
     var ruleName by remember { mutableStateOf(rule?.ruleName ?: "") }
-    var keyword by remember { mutableStateOf(rule?.keyword ?: "") }
+    val keywordChips = remember {
+        mutableStateListOf<String>().apply {
+            addAll(com.example.notivib.domain.model.parseKeywords(rule?.keyword ?: ""))
+        }
+    }
     var targetPackage by remember { mutableStateOf(rule?.targetPackage ?: "ANY") }
     var activeDays by remember { mutableStateOf(rule?.activeDays ?: setOf(1, 2, 3, 4, 5, 6, 7)) }
 
     var vibrationOnly by remember { mutableStateOf(rule?.vibrationOnly ?: false) }
     var muteOutsideSchedule by remember { mutableStateOf(rule?.muteOutsideSchedule ?: false) }
     var remindSchedule by remember { mutableStateOf(rule?.remindSchedule ?: false) }
-    var ignoredKeywords by remember { mutableStateOf(rule?.ignoredKeywords ?: "") }
+    val ignoredKeywordChips = remember {
+        mutableStateListOf<String>().apply {
+            addAll(com.example.notivib.domain.model.parseKeywords(rule?.ignoredKeywords ?: ""))
+        }
+    }
 
     var hasCustomTimeWindows by remember { mutableStateOf(rule?.hasCustomTimeWindows ?: false) }
     var customTimeWindows by remember {
@@ -85,18 +100,23 @@ fun EditRuleScreen(
     val accentColor = Color(0xFFD9FF0B)
     val textColor = Color(0xFFE0E0E0)
 
+    val initialKeywordParsed = remember(rule) { com.example.notivib.domain.model.parseKeywords(rule?.keyword ?: "") }
+    val initialIgnoredParsed = remember(rule) { com.example.notivib.domain.model.parseKeywords(rule?.ignoredKeywords ?: "") }
+    val currentKeywordString = keywordChips.joinToString("|||")
+    val currentIgnoredString = ignoredKeywordChips.joinToString("|||")
+
     val hasUnsavedChanges = remember(
-        ruleName, keyword, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule, 
-        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, ignoredKeywords
+        ruleName, currentKeywordString, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule, 
+        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, currentIgnoredString
     ) {
         ruleName != (rule?.ruleName ?: "") ||
-        keyword != (rule?.keyword ?: "") ||
+        keywordChips.toList() != initialKeywordParsed ||
         targetPackage != (rule?.targetPackage ?: "ANY") ||
         activeDays != (rule?.activeDays ?: setOf(1, 2, 3, 4, 5, 6, 7)) ||
         vibrationOnly != (rule?.vibrationOnly ?: false) ||
         muteOutsideSchedule != (rule?.muteOutsideSchedule ?: false) ||
         remindSchedule != (rule?.remindSchedule ?: false) ||
-        ignoredKeywords != (rule?.ignoredKeywords ?: "") ||
+        ignoredKeywordChips.toList() != initialIgnoredParsed ||
         hasCustomTimeWindows != (rule?.hasCustomTimeWindows ?: false) ||
         customTimeWindows != (rule?.customTimeWindows ?: emptyMap<Int, com.example.notivib.domain.model.TimeWindow>()) ||
         startTimeMinute != (rule?.startTimeMinute ?: 0) ||
@@ -237,7 +257,7 @@ fun EditRuleScreen(
                             id = rule?.id,
                             ruleName = ruleName,
                             targetPackage = targetPackage,
-                            keyword = keyword,
+                            keyword = keywordChips.joinToString("|||"),
                             startTimeMinute = startTimeMinute,
                             endTimeMinute = endTimeMinute,
                             vibrationOnly = vibrationOnly,
@@ -247,7 +267,7 @@ fun EditRuleScreen(
                             customTimeWindows = customTimeWindows,
                             muteOutsideSchedule = muteOutsideSchedule,
                             remindSchedule = remindSchedule,
-                            ignoredKeywords = ignoredKeywords
+                            ignoredKeywords = ignoredKeywordChips.joinToString("|||")
                         )
                         onNavigateBack()
                     },
@@ -297,49 +317,25 @@ fun EditRuleScreen(
             
             Spacer(Modifier.height(24.dp))
 
-            Text("Trigger Keywords (Comma Separated)", color = Color.White, fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = keyword,
-                onValueChange = { keyword = it },
-                placeholder = { Text("e.g. URGENT, Boss, Emergency", color = Color.Gray, fontFamily = HostGrotesk) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = darkSurface,
-                    unfocusedContainerColor = darkSurface,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = accentColor,
-                    unfocusedTextColor = accentColor
-                )
+            KeywordChipInputGroup(
+                title = "Trigger Keywords",
+                placeholder = "Type keyword & tap +",
+                keywords = keywordChips,
+                darkSurface = darkSurface,
+                accentColor = accentColor,
+                textColor = textColor
             )
 
             Spacer(Modifier.height(24.dp))
 
-            Text("Ignored Keywords (Comma Separated)", color = Color.White, fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = ignoredKeywords,
-                onValueChange = { ignoredKeywords = it },
-                placeholder = { Text("e.g. 429, timeout, scheduled", color = Color.Gray, fontFamily = HostGrotesk) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = darkSurface,
-                    unfocusedContainerColor = darkSurface,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = accentColor,
-                    unfocusedTextColor = accentColor
-                )
-            )
-            Text(
-                "Notifications containing these words will be skipped even if they match trigger keywords.",
-                fontFamily = HostGrotesk,
-                color = textColor,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp)
+            KeywordChipInputGroup(
+                title = "Ignored Keywords",
+                placeholder = "Type keyword & tap +",
+                helperText = "Notifications containing these words will be skipped even if they match trigger keywords.",
+                keywords = ignoredKeywordChips,
+                darkSurface = darkSurface,
+                accentColor = accentColor,
+                textColor = textColor
             )
 
             Spacer(Modifier.height(24.dp))
@@ -736,3 +732,139 @@ fun customTimePickerColors(): TimePickerColors {
         periodSelectorUnselectedContentColor = Color.White
     )
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun KeywordChipInputGroup(
+    title: String,
+    placeholder: String,
+    helperText: String? = null,
+    keywords: SnapshotStateList<String>,
+    darkSurface: Color,
+    accentColor: Color,
+    textColor: Color
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var textInput by remember { mutableStateOf("") }
+
+    val addKeyword = {
+        val trimmed = textInput.trim()
+        if (trimmed.isNotEmpty()) {
+            if (!keywords.contains(trimmed)) {
+                if (keywords.size < 15) {
+                    keywords.add(trimmed)
+                    textInput = ""
+                } else {
+                    android.widget.Toast.makeText(context, "Maximum 15 keywords allowed", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                textInput = ""
+            }
+        }
+    }
+
+    Column {
+        Text(
+            text = title,
+            color = Color.White,
+            fontFamily = HostGrotesk,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = textInput,
+                onValueChange = { textInput = it },
+                placeholder = { Text(placeholder, color = Color.Gray, fontFamily = HostGrotesk) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { addKeyword() }
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = darkSurface,
+                    unfocusedContainerColor = darkSurface,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = accentColor,
+                    unfocusedTextColor = accentColor
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            IconButton(
+                onClick = addKeyword,
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(darkSurface, RoundedCornerShape(12.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = "Add Keyword",
+                    tint = accentColor
+                )
+            }
+        }
+
+        if (helperText != null) {
+            Text(
+                text = helperText,
+                fontFamily = HostGrotesk,
+                color = textColor,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        if (keywords.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            com.example.notivib.presentation.components.SimpleFlowRow(
+                horizontalSpacing = 8.dp,
+                verticalSpacing = 8.dp
+            ) {
+                keywords.forEach { kw ->
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF404040),
+                        contentColor = Color.White
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                        ) {
+                            Text(
+                                text = kw,
+                                fontFamily = HostGrotesk,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp,
+                                color = accentColor
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable { keywords.remove(kw) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Remove",
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

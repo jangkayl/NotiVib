@@ -20,3 +20,9 @@ data class AlarmRule(
     val remindSchedule: Boolean = false,
     val ignoredKeywords: String = ""
 )
+
+fun parseKeywords(raw: String): List<String> {
+    if (raw.isBlank()) return emptyList()
+    val delimiter = if (raw.contains("|||")) "|||" else ","
+    return raw.split(delimiter).map { it.trim() }.filter { it.isNotEmpty() }
+}

@@ -63,12 +63,12 @@ class EvaluateNotificationUseCase @Inject constructor(
             }
 
             if (isWithinTime) {
-                val keywords = rule.keyword.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                val keywords = com.example.notivib.domain.model.parseKeywords(rule.keyword)
                 val matchKeyword = keywords.isEmpty() || keywords.any { kw ->
                     title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
                 }
                 if (matchKeyword) {
-                    val ignored = rule.ignoredKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    val ignored = com.example.notivib.domain.model.parseKeywords(rule.ignoredKeywords)
                     val isIgnored = ignored.any { ik ->
                         title.contains(ik, ignoreCase = true) || text.contains(ik, ignoreCase = true)
                     }

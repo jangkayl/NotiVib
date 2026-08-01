@@ -94,7 +94,10 @@ class InterceptorService : NotificationListenerService() {
                         packageName = packageName,
                         title = title.ifEmpty { "No Title" },
                         text = fullText.ifEmpty { "No Content" },
-                        matchedRule = matchedRule?.let { "Rule: ${it.targetPackage.ifEmpty{"Any App"}} / ${it.keyword.ifEmpty{"Any Keyword"}}" }
+                        matchedRule = matchedRule?.let { rule ->
+                            val kwDisplay = com.example.notivib.domain.model.parseKeywords(rule.keyword).joinToString(", ")
+                            "Rule: ${rule.targetPackage.ifEmpty{"Any App"}} / ${kwDisplay.ifEmpty{"Any Keyword"}}"
+                        }
                     )
                 }
 

@@ -69,7 +69,7 @@ Shown when required permissions are missing. Blocks access to the main app until
 - **Top App Bar**: Brand text on left. Diagnostics (`ecg_heart`) and Settings (`gear`) icons on right.
 - **Tab Navigation**: Full-width `TabRow` with "Active (N)" and "Inactive (N)" tabs. Selected tab uses primary accent color.
 - **Rule Cards**:
-  - Display: App icon, app name, package name, rule name, trigger keywords, active days (M/T/W/Th/F/S/Su circles), status indicators.
+  - Display: App icon, app name, package name, rule name, trigger keywords (displayed as oblong chip pills, max 4 + "+N more" overflow pill), active days (M/T/W/Th/F/S/Su circles), status indicators.
   - Active rules: Bright accent background with dark text.
   - Inactive rules: Dark surface (`#444444`) background with light text.
   - Tap to navigate to EditRuleScreen.
@@ -81,8 +81,8 @@ Shown when required permissions are missing. Blocks access to the main app until
 - **Top App Bar**: Back arrow, "Edit Rule" or "New Rule" title, red Delete icon (edit mode only).
 - **Form Fields** (scrollable):
   1. **Rule Name** — Text field with placeholder "e.g. Work Rule"
-  2. **Trigger Keywords** — Text field for comma-separated keywords with placeholder "e.g. URGENT, Boss, Emergency"
-  3. **Ignored Keywords** — Text field for comma-separated exclusion keywords with placeholder "e.g. 429, timeout, scheduled". Helper text: "Notifications containing these words will be skipped even if they match trigger keywords."
+  2. **Trigger Keywords** — Dynamic chip/tag input. Type text & tap `+` (or press keyboard Done) to add chip. Each chip features an `✕` remove button.
+  3. **Ignored Keywords** — Dynamic chip/tag input for exclusion keywords. Helper text: "Notifications containing these words will be skipped even if they match trigger keywords."
   4. **Target Application** — Card-style selector showing app icon, name, and package. Tapping opens full-screen dialog with search bar and scrollable app list. "ALL APPLICATIONS" option at top.
   5. **Active Days** — Row of 7 circular toggles (M, T, W, Th, F, S, Su). Active: `#D9FF0B` with black text. Inactive: `#5B5B5B` with white text. Minimum 1 day must remain selected.
   6. **Custom Schedule Per Day** — Checkbox to enable per-day time windows. When disabled: single global Start/End time picker. When enabled: per-day rows with individual start/end time buttons.
