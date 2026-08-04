@@ -338,19 +338,31 @@ fun LogItemCard(log: NotificationLog, onDelete: () -> Unit) {
     }
 }
 
+private object AppIconCache {
+    private val cache = android.util.LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(100)
+
+    fun get(packageName: String): androidx.compose.ui.graphics.ImageBitmap? = cache.get(packageName)
+    fun put(packageName: String, bitmap: androidx.compose.ui.graphics.ImageBitmap) = cache.put(packageName, bitmap)
+}
+
 @Composable
 fun AppIconImage(packageName: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    var bitmap by remember(packageName) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var bitmap by remember(packageName) { mutableStateOf(AppIconCache.get(packageName)) }
+    
     LaunchedEffect(packageName) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val d = context.packageManager.getApplicationIcon(packageName)
-                val width = if (d.intrinsicWidth > 0) d.intrinsicWidth else 100
-                val height = if (d.intrinsicHeight > 0) d.intrinsicHeight else 100
-                val b = d.toBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                bitmap = b.asImageBitmap()
-            } catch (e: Exception) {}
+        if (bitmap == null && packageName.isNotEmpty()) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val d = context.packageManager.getApplicationIcon(packageName)
+                    val width = if (d.intrinsicWidth > 0) d.intrinsicWidth else 100
+                    val height = if (d.intrinsicHeight > 0) d.intrinsicHeight else 100
+                    val b = d.toBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val imgBitmap = b.asImageBitmap()
+                    AppIconCache.put(packageName, imgBitmap)
+                    bitmap = imgBitmap
+                } catch (e: Exception) {}
+            }
         }
     }
     
