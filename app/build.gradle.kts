@@ -62,4 +62,7 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
 }

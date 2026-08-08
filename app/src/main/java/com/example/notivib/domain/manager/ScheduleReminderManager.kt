@@ -6,12 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.notivib.domain.model.AlarmRule
-import com.example.notivib.domain.repository.RuleRepository
 import com.example.notivib.framework.receiver.ScheduleReminderReceiver
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -63,9 +58,9 @@ object ScheduleReminderManager {
             val intent = Intent(context, ScheduleReminderReceiver::class.java).apply {
                 putExtra("APP_NAME", rule.targetPackage.ifEmpty { "Any App" })
                 putExtra("RULE_ID", rule.id)
+                putExtra("RULE_NAME", rule.ruleName)
                 putExtra("IS_START", true)
             }
-            // Use positive hash code for request code to avoid collisions, but keep start and end separate
             val requestCode = (rule.id.hashCode() * 31) + 1
             val pendingIntent = PendingIntent.getBroadcast(
                 context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -82,6 +77,7 @@ object ScheduleReminderManager {
             val intent = Intent(context, ScheduleReminderReceiver::class.java).apply {
                 putExtra("APP_NAME", rule.targetPackage.ifEmpty { "Any App" })
                 putExtra("RULE_ID", rule.id)
+                putExtra("RULE_NAME", rule.ruleName)
                 putExtra("IS_START", false)
             }
             val requestCode = (rule.id.hashCode() * 31) + 2
@@ -116,11 +112,12 @@ object ScheduleReminderManager {
         alarmManager.cancel(endPendingIntent)
     }
 
-    fun scheduleFollowUp(context: Context, appName: String, ruleId: String, isStart: Boolean) {
+    fun scheduleFollowUp(context: Context, appName: String, ruleId: String, isStart: Boolean, ruleName: String = "") {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ScheduleReminderReceiver::class.java).apply {
             putExtra("APP_NAME", appName)
             putExtra("RULE_ID", ruleId)
+            putExtra("RULE_NAME", ruleName)
             putExtra("IS_START", isStart)
             putExtra("IS_FOLLOWUP", true)
         }

@@ -22,6 +22,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -62,9 +64,15 @@ fun EditRuleScreen(
     var remindSchedule by remember { mutableStateOf(rule?.remindSchedule ?: false) }
     val ignoredKeywordChips = remember {
         mutableStateListOf<String>().apply {
-            addAll(com.example.notivib.domain.model.parseKeywords(rule?.ignoredKeywords ?: ""))
+            val triggerParsed = com.example.notivib.domain.model.parseKeywords(rule?.keyword ?: "").map { it.lowercase() }
+            val ignoredParsed = com.example.notivib.domain.model.parseKeywords(rule?.ignoredKeywords ?: "")
+                .filter { !triggerParsed.contains(it.lowercase()) }
+            addAll(ignoredParsed)
         }
     }
+
+    var triggerInputText by remember { mutableStateOf("") }
+    var ignoredInputText by remember { mutableStateOf("") }
 
     var hasCustomTimeWindows by remember { mutableStateOf(rule?.hasCustomTimeWindows ?: false) }
     var customTimeWindows by remember {
@@ -72,6 +80,17 @@ fun EditRuleScreen(
     }
     var startTimeMinute by remember { mutableStateOf(rule?.startTimeMinute ?: 0) }
     var endTimeMinute by remember { mutableStateOf(rule?.endTimeMinute ?: 1439) }
+
+    val outsideScheduleMinutes = remember(activeDays, hasCustomTimeWindows, startTimeMinute, endTimeMinute, customTimeWindows) {
+        calculateOutsideScheduleMinutes(activeDays, hasCustomTimeWindows, startTimeMinute, endTimeMinute, customTimeWindows)
+    }
+    val hasOutsideSchedule = outsideScheduleMinutes >= 30
+
+    LaunchedEffect(hasOutsideSchedule) {
+        if (!hasOutsideSchedule) {
+            muteOutsideSchedule = false
+        }
+    }
 
     var appName by remember { 
         mutableStateOf(
@@ -107,8 +126,11 @@ fun EditRuleScreen(
 
     val hasUnsavedChanges = remember(
         ruleName, currentKeywordString, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule, 
-        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, currentIgnoredString
+        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, currentIgnoredString,
+        triggerInputText, ignoredInputText
     ) {
+        triggerInputText.trim().isNotEmpty() ||
+        ignoredInputText.trim().isNotEmpty() ||
         ruleName != (rule?.ruleName ?: "") ||
         keywordChips.toList() != initialKeywordParsed ||
         targetPackage != (rule?.targetPackage ?: "ANY") ||
@@ -253,6 +275,25 @@ fun EditRuleScreen(
                 }
                 Button(
                     onClick = {
+                        if (triggerInputText.trim().isNotEmpty()) {
+                            val ok = tryAddKeyword(triggerInputText, keywordChips, ignoredKeywordChips, "Trigger Keywords", "Ignored Keywords", context) {
+                                triggerInputText = ""
+                            }
+                            if (!ok) return@Button
+                        }
+
+                        if (ignoredInputText.trim().isNotEmpty()) {
+                            val ok = tryAddKeyword(ignoredInputText, ignoredKeywordChips, keywordChips, "Ignored Keywords", "Trigger Keywords", context) {
+                                ignoredInputText = ""
+                            }
+                            if (!ok) return@Button
+                        }
+
+                        if (keywordChips.isEmpty()) {
+                            android.widget.Toast.makeText(context, "Please add at least one trigger keyword", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
                         val existingRules = viewModel.rules.value
                         val isDuplicateName = existingRules.any { it.ruleName.equals(ruleName, ignoreCase = true) && it.ruleName.isNotEmpty() && it.id != rule?.id }
                         
@@ -278,11 +319,6 @@ fun EditRuleScreen(
                         
                         if (isExactDuplicate) {
                             android.widget.Toast.makeText(context, "An identical rule already exists for this app", android.widget.Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        
-                        if (keywordChips.isEmpty()) {
-                            android.widget.Toast.makeText(context, "Please add at least one trigger keyword", android.widget.Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
@@ -354,7 +390,11 @@ fun EditRuleScreen(
             KeywordChipInputGroup(
                 title = "Trigger Keywords",
                 placeholder = "Type keyword & tap +",
+                textInput = triggerInputText,
+                onTextInputChange = { triggerInputText = it },
                 keywords = keywordChips,
+                otherKeywords = ignoredKeywordChips,
+                otherTitle = "Ignored Keywords",
                 darkSurface = darkSurface,
                 accentColor = accentColor,
                 textColor = textColor
@@ -366,7 +406,11 @@ fun EditRuleScreen(
                 title = "Ignored Keywords",
                 placeholder = "Type keyword & tap +",
                 helperText = "Notifications containing these words will be skipped even if they match trigger keywords.",
+                textInput = ignoredInputText,
+                onTextInputChange = { ignoredInputText = it },
                 keywords = ignoredKeywordChips,
+                otherKeywords = keywordChips,
+                otherTitle = "Trigger Keywords",
                 darkSurface = darkSurface,
                 accentColor = accentColor,
                 textColor = textColor
@@ -558,30 +602,28 @@ fun EditRuleScreen(
                 }
 
                 if (showStartTimePicker) {
-                    val timePickerState = rememberTimePickerState(initialHour = startTimeMinute / 60, initialMinute = startTimeMinute % 60, is24Hour = true)
-                    TimePickerDialog(
+                    CustomTimePickerDialog(
                         title = "Select Global Start Time",
+                        initialHour = startTimeMinute / 60,
+                        initialMinute = startTimeMinute % 60,
                         onCancel = { showStartTimePicker = false },
-                        onConfirm = {
-                            startTimeMinute = timePickerState.hour * 60 + timePickerState.minute
+                        onConfirm = { hour, min ->
+                            startTimeMinute = hour * 60 + min
                             showStartTimePicker = false
                         }
-                    ) {
-                        TimePicker(state = timePickerState, colors = customTimePickerColors())
-                    }
+                    )
                 }
                 if (showEndTimePicker) {
-                    val timePickerState = rememberTimePickerState(initialHour = endTimeMinute / 60, initialMinute = endTimeMinute % 60, is24Hour = true)
-                    TimePickerDialog(
+                    CustomTimePickerDialog(
                         title = "Select Global End Time",
+                        initialHour = endTimeMinute / 60,
+                        initialMinute = endTimeMinute % 60,
                         onCancel = { showEndTimePicker = false },
-                        onConfirm = {
-                            endTimeMinute = timePickerState.hour * 60 + timePickerState.minute
+                        onConfirm = { hour, min ->
+                            endTimeMinute = hour * 60 + min
                             showEndTimePicker = false
                         }
-                    ) {
-                        TimePicker(state = timePickerState, colors = customTimePickerColors())
-                    }
+                    )
                 }
             } else {
                 val daysOfWeek = listOf(1 to "Monday", 2 to "Tuesday", 3 to "Wednesday", 4 to "Thursday", 5 to "Friday", 6 to "Saturday", 7 to "Sunday")
@@ -611,28 +653,30 @@ fun EditRuleScreen(
                             }
                         }
                         if (showDayStartPicker) {
-                            val timePickerState = rememberTimePickerState(initialHour = dayWindow.startTimeMinute / 60, initialMinute = dayWindow.startTimeMinute % 60, is24Hour = true)
-                            TimePickerDialog(
-                                title = "Select Start Time",
+                            CustomTimePickerDialog(
+                                title = "Select Start Time ($dayName)",
+                                initialHour = dayWindow.startTimeMinute / 60,
+                                initialMinute = dayWindow.startTimeMinute % 60,
                                 onCancel = { showDayStartPicker = false },
-                                onConfirm = {
-                                    val newMin = timePickerState.hour * 60 + timePickerState.minute
+                                onConfirm = { hour, min ->
+                                    val newMin = hour * 60 + min
                                     customTimeWindows = customTimeWindows.toMutableMap().apply { put(dayInt, dayWindow.copy(startTimeMinute = newMin)) }
                                     showDayStartPicker = false
                                 }
-                            ) { TimePicker(state = timePickerState, colors = customTimePickerColors()) }
+                            )
                         }
                         if (showDayEndPicker) {
-                            val timePickerState = rememberTimePickerState(initialHour = dayWindow.endTimeMinute / 60, initialMinute = dayWindow.endTimeMinute % 60, is24Hour = true)
-                            TimePickerDialog(
-                                title = "Select End Time",
+                            CustomTimePickerDialog(
+                                title = "Select End Time ($dayName)",
+                                initialHour = dayWindow.endTimeMinute / 60,
+                                initialMinute = dayWindow.endTimeMinute % 60,
                                 onCancel = { showDayEndPicker = false },
-                                onConfirm = {
-                                    val newMin = timePickerState.hour * 60 + timePickerState.minute
+                                onConfirm = { hour, min ->
+                                    val newMin = hour * 60 + min
                                     customTimeWindows = customTimeWindows.toMutableMap().apply { put(dayInt, dayWindow.copy(endTimeMinute = newMin)) }
                                     showDayEndPicker = false
                                 }
-                            ) { TimePicker(state = timePickerState, colors = customTimePickerColors()) }
+                            )
                         }
                     }
                 }
@@ -653,16 +697,18 @@ fun EditRuleScreen(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { muteOutsideSchedule = !muteOutsideSchedule }.padding(vertical = 8.dp)) {
-                Checkbox(
-                    checked = muteOutsideSchedule, 
-                    onCheckedChange = { muteOutsideSchedule = it },
-                    colors = CheckboxDefaults.colors(checkedColor = accentColor, checkmarkColor = Color.Black, uncheckedColor = Color.White)
-                )
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text("Mute notifications outside schedule", fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                    Text("Silently deletes notifications outside the active window.", fontFamily = HostGrotesk, color = textColor, fontSize = 12.sp)
+            if (hasOutsideSchedule) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { muteOutsideSchedule = !muteOutsideSchedule }.padding(vertical = 8.dp)) {
+                    Checkbox(
+                        checked = muteOutsideSchedule, 
+                        onCheckedChange = { muteOutsideSchedule = it },
+                        colors = CheckboxDefaults.colors(checkedColor = accentColor, checkmarkColor = Color.Black, uncheckedColor = Color.White)
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text("Mute notifications outside schedule", fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                        Text("Silently deletes notifications outside the active window.", fontFamily = HostGrotesk, color = textColor, fontSize = 12.sp)
+                    }
                 }
             }
 
@@ -694,26 +740,19 @@ fun TimePickerDialog(
 ) {
     Dialog(
         onDismissRequest = onCancel,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = true),
     ) {
         Surface(
-            shape = MaterialTheme.shapes.extraLarge,
+            shape = RoundedCornerShape(24.dp),
             tonalElevation = 6.dp,
-            modifier = Modifier
-                .width(IntrinsicSize.Min)
-                .height(IntrinsicSize.Min)
-                .background(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = Color(0xFF161618)
-                ),
             color = Color(0xFF161618)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     text = title,
                     color = Color.White,
                     fontFamily = HostGrotesk,
@@ -724,24 +763,87 @@ fun TimePickerDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp, bottom = 8.dp),
+                        .padding(top = 16.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     toggle()
                     Spacer(modifier = Modifier.weight(1f))
-                    TextButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) { 
-                        Text("Cancel", color = Color.White, fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, fontSize = 16.sp) 
+                    TextButton(
+                        onClick = onCancel,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) { 
+                        Text(
+                            text = "Cancel", 
+                            color = Color.White, 
+                            fontFamily = HostGrotesk, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 14.sp
+                        ) 
                     }
+                    Spacer(modifier = Modifier.width(4.dp))
                     Button(
                         onClick = onConfirm,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9FF0B), contentColor = Color.Black),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
                     ) { 
-                        Text("Select", fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, fontSize = 16.sp) 
+                        Text(
+                            text = "Select", 
+                            fontFamily = HostGrotesk, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 14.sp,
+                            softWrap = false
+                        ) 
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CustomTimePickerDialog(
+    title: String = "Select Time",
+    initialHour: Int,
+    initialMinute: Int,
+    onCancel: () -> Unit,
+    onConfirm: (hour: Int, minute: Int) -> Unit
+) {
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
+    var showKeyboardInput by remember { mutableStateOf(true) }
+
+    TimePickerDialog(
+        title = title,
+        onCancel = onCancel,
+        onConfirm = {
+            onConfirm(timePickerState.hour, timePickerState.minute)
+        },
+        toggle = {
+            IconButton(onClick = { showKeyboardInput = !showKeyboardInput }) {
+                Icon(
+                    imageVector = if (showKeyboardInput) Icons.Outlined.Schedule else Icons.Outlined.Keyboard,
+                    contentDescription = if (showKeyboardInput) "Switch to Clock Dial" else "Switch to Keyboard Input",
+                    tint = Color(0xFFD9FF0B)
+                )
+            }
+        }
+    ) {
+        if (showKeyboardInput) {
+            TimeInput(
+                state = timePickerState,
+                colors = customTimePickerColors()
+            )
+        } else {
+            TimePicker(
+                state = timePickerState,
+                colors = customTimePickerColors()
+            )
         }
     }
 }
@@ -767,33 +869,90 @@ fun customTimePickerColors(): TimePickerColors {
     )
 }
 
+fun calculateOutsideScheduleMinutes(
+    activeDays: Set<Int>,
+    hasCustomTimeWindows: Boolean,
+    startTimeMinute: Int,
+    endTimeMinute: Int,
+    customTimeWindows: Map<Int, com.example.notivib.domain.model.TimeWindow>
+): Int {
+    var totalOutsideMinutes = 0
+    for (day in 1..7) {
+        if (!activeDays.contains(day)) {
+            totalOutsideMinutes += 1440
+        } else {
+            val (start, end) = if (hasCustomTimeWindows) {
+                val window = customTimeWindows[day] ?: com.example.notivib.domain.model.TimeWindow(0, 1439)
+                window.startTimeMinute to window.endTimeMinute
+            } else {
+                startTimeMinute to endTimeMinute
+            }
+            
+            val activeMinutes = if (start == 0 && (end == 1439 || end == 1440)) {
+                1440
+            } else if (start < end) {
+                (end - start + 1).coerceAtMost(1440)
+            } else if (start > end) {
+                ((1440 - start) + end + 1).coerceAtMost(1440)
+            } else {
+                1440
+            }
+            
+            val outsideMinutes = (1440 - activeMinutes).coerceAtLeast(0)
+            totalOutsideMinutes += outsideMinutes
+        }
+    }
+    return totalOutsideMinutes
+}
+
+fun tryAddKeyword(
+    rawText: String,
+    targetList: SnapshotStateList<String>,
+    otherList: List<String>,
+    targetTitle: String,
+    otherTitle: String,
+    context: android.content.Context,
+    onSuccess: () -> Unit = {}
+): Boolean {
+    val trimmed = rawText.trim()
+    if (trimmed.isEmpty()) return true
+    if (targetList.any { it.equals(trimmed, ignoreCase = true) }) {
+        onSuccess()
+        return true
+    }
+    if (otherList.any { it.equals(trimmed, ignoreCase = true) }) {
+        android.widget.Toast.makeText(context, "Cannot add: '$trimmed' already exists in $otherTitle", android.widget.Toast.LENGTH_SHORT).show()
+        return false
+    }
+    if (targetList.size >= 15) {
+        android.widget.Toast.makeText(context, "Maximum 15 keywords allowed", android.widget.Toast.LENGTH_SHORT).show()
+        return false
+    }
+    targetList.add(trimmed)
+    onSuccess()
+    return true
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun KeywordChipInputGroup(
     title: String,
     placeholder: String,
     helperText: String? = null,
+    textInput: String,
+    onTextInputChange: (String) -> Unit,
     keywords: SnapshotStateList<String>,
+    otherKeywords: List<String> = emptyList(),
+    otherTitle: String = "",
     darkSurface: Color,
     accentColor: Color,
     textColor: Color
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var textInput by remember { mutableStateOf("") }
 
-    val addKeyword = {
-        val trimmed = textInput.trim()
-        if (trimmed.isNotEmpty()) {
-            if (!keywords.contains(trimmed)) {
-                if (keywords.size < 15) {
-                    keywords.add(trimmed)
-                    textInput = ""
-                } else {
-                    android.widget.Toast.makeText(context, "Maximum 15 keywords allowed", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                textInput = ""
-            }
+    val addKeyword: () -> Unit = {
+        tryAddKeyword(textInput, keywords, otherKeywords, title, otherTitle, context) {
+            onTextInputChange("")
         }
     }
 
@@ -812,7 +971,7 @@ fun KeywordChipInputGroup(
         ) {
             OutlinedTextField(
                 value = textInput,
-                onValueChange = { textInput = it },
+                onValueChange = onTextInputChange,
                 placeholder = { Text(placeholder, color = Color.Gray, fontFamily = HostGrotesk) },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),

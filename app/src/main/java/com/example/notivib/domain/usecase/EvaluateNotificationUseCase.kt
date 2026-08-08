@@ -7,7 +7,7 @@ import java.time.LocalTime
 import javax.inject.Inject
 
 sealed class EvaluationResult {
-    data class TriggerAlarm(val rule: AlarmRule) : EvaluationResult()
+    data class TriggerAlarm(val rule: AlarmRule, val matchedKeywords: List<String> = emptyList()) : EvaluationResult()
     data class Mute(val rule: AlarmRule) : EvaluationResult()
     object Ignore : EvaluationResult()
 }
@@ -66,16 +66,22 @@ class EvaluateNotificationUseCase @Inject constructor(
             if (isWithinTime) {
                 isAnyRuleActiveForApp = true // Mark that the app has an active rule right now
                 val keywords = com.example.notivib.domain.model.parseKeywords(rule.keyword)
-                val matchKeyword = keywords.isEmpty() || keywords.any { kw ->
-                    title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
+                val matchedKwList = if (keywords.isEmpty()) {
+                    emptyList()
+                } else {
+                    keywords.filter { kw ->
+                        title.contains(kw, ignoreCase = true) || text.contains(kw, ignoreCase = true)
+                    }
                 }
+
+                val matchKeyword = keywords.isEmpty() || matchedKwList.isNotEmpty()
                 if (matchKeyword) {
                     val ignored = com.example.notivib.domain.model.parseKeywords(rule.ignoredKeywords)
                     val isIgnored = ignored.any { ik ->
                         title.contains(ik, ignoreCase = true) || text.contains(ik, ignoreCase = true)
                     }
                     if (!isIgnored) {
-                        return EvaluationResult.TriggerAlarm(rule)
+                        return EvaluationResult.TriggerAlarm(rule, matchedKwList)
                     }
                 }
             } else if (rule.muteOutsideSchedule && !isAnyApp) {

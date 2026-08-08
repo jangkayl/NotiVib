@@ -86,6 +86,7 @@ class ActiveAlarmService : Service() {
                 stopSelf()
 
                 val ruleId = intent?.getStringExtra("RULE_ID")
+                val ruleName = intent?.getStringExtra("RULE_NAME") ?: ""
                 val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
                 val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
 
@@ -95,7 +96,8 @@ class ActiveAlarmService : Service() {
                             context = this,
                             appName = appName,
                             ruleId = ruleId,
-                            isStart = (mode == MODE_SCHEDULE_START)
+                            isStart = (mode == MODE_SCHEDULE_START),
+                            ruleName = ruleName
                         )
                     }
                 }
@@ -119,12 +121,12 @@ class ActiveAlarmService : Service() {
             action = ACTION_STOP
             putExtra("APP_NAME", appName)
             putExtra("RULE_ID", ruleId)
+            putExtra("RULE_NAME", ruleName)
             putExtra(EXTRA_ALARM_MODE, mode)
         }
         val stopPendingIntent = PendingIntent.getService(
             this, System.currentTimeMillis().toInt(), stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-
 
         val fullScreenIntent = Intent(this, com.example.notivib.presentation.alarm.AlarmActivity::class.java).apply {
             putExtra("APP_NAME", appName)
@@ -146,10 +148,11 @@ class ActiveAlarmService : Service() {
             MODE_SCHEDULE_END_FOLLOWUP -> "Follow-up: Schedule Ended"
             else -> "NotiVib Alarm Active!"
         }
+        val formattedKeyword = keyword.replace("|||", ", ")
         val text = when (mode) {
             MODE_SCHEDULE_START, MODE_SCHEDULE_START_FOLLOWUP -> "$appName interception is now active."
             MODE_SCHEDULE_END, MODE_SCHEDULE_END_FOLLOWUP -> "$appName interception has ended."
-            else -> "Matched: $appName - $keyword"
+            else -> "Matched: $appName - $formattedKeyword"
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -185,7 +188,6 @@ class ActiveAlarmService : Service() {
         if (!isVibrationOnly) {
             ringtone?.play()
         }
-
 
         val pattern = longArrayOf(0, 500, 500)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
