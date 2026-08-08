@@ -66,12 +66,15 @@ class RulesListViewModel @Inject constructor(
         ignoredKeywords: String = ""
     ) {
         val ruleId = id ?: java.util.UUID.randomUUID().toString()
-        val deduplicatedKeyword = com.example.notivib.domain.model.parseKeywords(keyword)
+        val triggerList = com.example.notivib.domain.model.parseKeywords(keyword)
             .distinctBy { it.lowercase() }
-            .joinToString("|||")
+        val triggerLower = triggerList.map { it.lowercase() }.toSet()
+
+        val deduplicatedKeyword = triggerList.joinToString("|||")
 
         val deduplicatedIgnored = com.example.notivib.domain.model.parseKeywords(ignoredKeywords)
             .distinctBy { it.lowercase() }
+            .filter { !triggerLower.contains(it.lowercase()) }
             .joinToString("|||")
 
         viewModelScope.launch {
