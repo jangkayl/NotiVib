@@ -9,11 +9,17 @@ import com.example.notivib.domain.usecase.EvaluateNotificationUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class InterceptorService : NotificationListenerService() {
+
+    companion object {
+        var isConnected = false
+    }
 
     @Inject
     lateinit var evaluateNotificationUseCase: EvaluateNotificationUseCase
@@ -21,60 +27,44 @@ class InterceptorService : NotificationListenerService() {
     @Inject
     lateinit var notificationLogRepository: NotificationLogRepository
 
-    private val scope = CoroutineScope(Dispatchers.IO)
-
-    companion object {
-        var isConnected = false
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        notificationLogRepository.addSystemLog("Service Process Created by Android OS")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        notificationLogRepository.addSystemLog("Service Process Destroyed by Android OS")
-    }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         isConnected = true
-        notificationLogRepository.addSystemLog("Interceptor Successfully Connected to Notification Stream")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         isConnected = false
-        notificationLogRepository.addSystemLog("Interceptor Disconnected from Notification Stream")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isConnected = false
+        scope.cancel()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
-        if (!com.example.notivib.framework.utils.EngineState.shouldIntercept(this)) {
-            return
-        }
-
         sbn?.let {
-            val packageName = it.packageName
+            val packageName = it.packageName ?: return
+            if (packageName == this.packageName) return // Ignore self
+
             val extras = it.notification.extras
             val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
             val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-            val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
             val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+            val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+            val fullText = "$text $bigText $subText".trim()
 
-            val fullText = buildString {
-                if (text.isNotEmpty()) append(text)
-                if (subText.isNotEmpty()) append("\nSub: $subText")
-                if (bigText.isNotEmpty() && bigText != text) append("\nExtended: $bigText")
-            }
-
-            val pm = packageManager
-            val appName = try {
+            var appName = ""
+            try {
+                val pm = packageManager
                 val ai = pm.getApplicationInfo(packageName, 0)
-                pm.getApplicationLabel(ai).toString()
+                appName = pm.getApplicationLabel(ai).toString()
             } catch (e: Exception) {
-                ""
+                appName = packageName
             }
 
             scope.launch {
@@ -104,7 +94,18 @@ class InterceptorService : NotificationListenerService() {
                 when (evaluationResult) {
                     is com.example.notivib.domain.usecase.EvaluationResult.TriggerAlarm -> {
                         if (!ActiveAlarmService.isAlarmRunning) {
-                            triggerAlarm(appName.ifEmpty { packageName }, evaluationResult.rule.keyword.ifEmpty { "Any" }, evaluationResult.rule.vibrationOnly, evaluationResult.rule.ruleName)
+                            val matchedKwDisplay = if (evaluationResult.matchedKeywords.isNotEmpty()) {
+                                evaluationResult.matchedKeywords.joinToString(", ")
+                            } else {
+                                val parsed = com.example.notivib.domain.model.parseKeywords(evaluationResult.rule.keyword)
+                                if (parsed.isNotEmpty()) parsed.joinToString(", ") else "Any"
+                            }
+                            triggerAlarm(
+                                appName = appName.ifEmpty { packageName },
+                                keyword = matchedKwDisplay,
+                                vibrationOnly = evaluationResult.rule.vibrationOnly,
+                                ruleName = evaluationResult.rule.ruleName
+                            )
                         }
                     }
                     is com.example.notivib.domain.usecase.EvaluationResult.Mute -> {

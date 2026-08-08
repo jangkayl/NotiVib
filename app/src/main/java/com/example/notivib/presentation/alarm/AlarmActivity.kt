@@ -1,57 +1,39 @@
 package com.example.notivib.presentation.alarm
 
 import android.content.Intent
-
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import android.os.Bundle
-
 import androidx.activity.ComponentActivity
-
 import androidx.activity.compose.setContent
-
-import androidx.compose.foundation.background
-
-import androidx.compose.foundation.layout.*
-
-import androidx.compose.material3.*
-
-import androidx.compose.runtime.Composable
-
-import androidx.compose.runtime.getValue
-
-import androidx.compose.runtime.setValue
-
-import androidx.compose.ui.Alignment
-
-import androidx.compose.ui.Modifier
-
-import androidx.compose.ui.graphics.Color
-
-import androidx.compose.ui.text.font.FontWeight
-
-import androidx.compose.ui.tooling.preview.Preview
-
-import androidx.compose.ui.unit.dp
-
-import androidx.compose.ui.unit.sp
-
 import androidx.compose.animation.core.*
-
-import androidx.compose.ui.graphics.Brush
-
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-
-import androidx.compose.material.icons.outlined.*
-
-import androidx.compose.material.icons.automirrored.outlined.*
-
-import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.foundation.BorderStroke
-
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
 import com.example.notivib.framework.service.ActiveAlarmService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class AlarmActivity : ComponentActivity() {
 
@@ -80,23 +62,14 @@ class AlarmActivity : ComponentActivity() {
         )
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-
             setShowWhenLocked(true)
-
             setTurnScreenOn(true)
-
         } else {
-
             @Suppress("DEPRECATION")
-
             window.addFlags(
-
                 android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-
                 android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-
             )
-
         }
 
         val appName = intent.getStringExtra("APP_NAME") ?: "An App"
@@ -126,9 +99,7 @@ class AlarmActivity : ComponentActivity() {
                 }
             )
         }
-
     }
-
 }
 
 data class Captcha(val prompt: String, val answer: String)
@@ -146,185 +117,420 @@ fun generateCaptcha(): Captcha {
     }
 }
 
+private data class InterceptionThemeSpec(
+    val backgroundColor: Color,
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String
+)
+
 @Composable
-fun AlarmScreen(appName: String, keyword: String, mode: Int, ruleName: String, onAcknowledge: () -> Unit) {
-    var captchaAnswer by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+fun RuleAppPill(
+    ruleName: String,
+    appName: String,
+    darkColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val displayText = ruleName.ifEmpty { appName }
+
+    var appIconBitmap by remember(appName, ruleName) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(appName, ruleName) {
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            var iconDrawable: Drawable? = try {
+                if (appName.isNotEmpty()) pm.getApplicationIcon(appName) else null
+            } catch (e: Exception) {
+                null
+            }
+
+            if (iconDrawable == null && ruleName.isNotEmpty()) {
+                iconDrawable = try {
+                    pm.getApplicationIcon(ruleName)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            if (iconDrawable == null && appName.isNotEmpty()) {
+                try {
+                    val packages = pm.getInstalledApplications(0)
+                    for (appInfo in packages) {
+                        val label = pm.getApplicationLabel(appInfo).toString()
+                        if (label.equals(appName, ignoreCase = true)) {
+                            iconDrawable = pm.getApplicationIcon(appInfo)
+                            break
+                        }
+                    }
+                } catch (e: Exception) {}
+            }
+
+            if (iconDrawable != null) {
+                try {
+                    val w = if (iconDrawable.intrinsicWidth > 0) iconDrawable.intrinsicWidth else 96
+                    val h = if (iconDrawable.intrinsicHeight > 0) iconDrawable.intrinsicHeight else 96
+                    val b = iconDrawable.toBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    appIconBitmap = b.asImageBitmap()
+                } catch (e: Exception) {}
+            }
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, darkColor),
+        shadowElevation = 0.dp,
+        modifier = modifier
+            .fillMaxWidth(0.9f)
+            .height(56.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (appIconBitmap != null) {
+                Image(
+                    bitmap = appIconBitmap!!,
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+
+            Text(
+                text = displayText,
+                color = darkColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun AlarmScreen(
+    appName: String,
+    keyword: String,
+    mode: Int,
+    ruleName: String,
+    onAcknowledge: () -> Unit
+) {
+    var captchaAnswer by remember { mutableStateOf("") }
     val isFollowUp = mode == ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP || mode == ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP
-    val captcha = androidx.compose.runtime.remember { generateCaptcha() }
+    val captcha = remember { generateCaptcha() }
     val isAcknowledgeEnabled = if (isFollowUp) captchaAnswer.equals(captcha.answer, ignoreCase = true) else true
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val darkColor = Color(0xFF1C1B1F)
+
+    val themeSpec = when (mode) {
+        ActiveAlarmService.MODE_SCHEDULE_START -> InterceptionThemeSpec(
+            backgroundColor = Color(0xFFD9FF0B), // Lime Green
+            icon = rocket_launch,
+            title = "Schedule Started",
+            subtitle = "Interception window has begun."
+        )
+        ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> InterceptionThemeSpec(
+            backgroundColor = Color(0xFFD9FF0B), // Lime Green
+            icon = extension,
+            title = "Follow-up Reminder",
+            subtitle = "Solve the captcha to confirm"
+        )
+        ActiveAlarmService.MODE_SCHEDULE_END -> InterceptionThemeSpec(
+            backgroundColor = Color(0xFFFFCE0B), // Amber / Yellow
+            icon = hourglass_bottom,
+            title = "Schedule Ended",
+            subtitle = "Interception window has ended."
+        )
+        ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> InterceptionThemeSpec(
+            backgroundColor = Color(0xFFFFCE0B), // Amber / Yellow
+            icon = extension,
+            title = "Follow-up Reminder",
+            subtitle = "Solve the captcha to confirm"
+        )
+        else -> InterceptionThemeSpec(
+            backgroundColor = Color(0xFFFF0B0B), // Vibrant Red #FF0B0B
+            icon = bolt,
+            title = "Interception Alert",
+            subtitle = "A critical notification has matched your rules"
+        )
+    }
+
+    // Prominent, highly noticeable color pulse animation for background and icon glow
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse_animation")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.1f,
-        targetValue = 0.5f,
+        initialValue = 0.15f,
+        targetValue = 0.90f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_alpha"
     )
-
-    val themeColor = when (mode) {
-        ActiveAlarmService.MODE_SCHEDULE_START, ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> Color(0xFF00FF00) // Green
-        ActiveAlarmService.MODE_SCHEDULE_END, ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> Color(0xFFFFD700) // Yellow
-        else -> Color.Red
-    }
-    
-    val title = when (mode) {
-        ActiveAlarmService.MODE_SCHEDULE_START -> "SCHEDULE STARTED"
-        ActiveAlarmService.MODE_SCHEDULE_END -> "SCHEDULE ENDED"
-        ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> "FOLLOW-UP REMINDER"
-        ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> "FOLLOW-UP REMINDER"
-        else -> "INTERCEPTION ALERT"
-    }
-
-    val subtitle = when (mode) {
-        ActiveAlarmService.MODE_SCHEDULE_START -> "The interception window has begun."
-        ActiveAlarmService.MODE_SCHEDULE_END -> "The interception window has ended."
-        ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> "Solve the captcha to confirm you are awake and ready for interception."
-        ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> "Solve the captcha to confirm you are awake."
-        else -> "A critical notification has matched your rules."
-    }
-
-    val icon = when (mode) {
-        ActiveAlarmService.MODE_SCHEDULE_START, ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP -> Icons.Outlined.CircleNotifications
-        ActiveAlarmService.MODE_SCHEDULE_END, ActiveAlarmService.MODE_SCHEDULE_END_FOLLOWUP -> Icons.Outlined.CircleNotifications
-        else -> Icons.Filled.Warning
-    }
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
 
     MaterialTheme {
-
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(themeSpec.backgroundColor)
+        ) {
+            // Dynamic Ambient Color Shifting Overlay (highly noticeable fade pulse across all themes)
             Box(
-
                 modifier = Modifier
-
                     .fillMaxSize()
-
                     .background(
                         Brush.radialGradient(
-                            colors = listOf(themeColor.copy(alpha = pulseAlpha), Color.Transparent),
-                            radius = 1200f
+                            colors = listOf(
+                                Color.White.copy(alpha = pulseAlpha * 0.70f),
+                                themeSpec.backgroundColor.copy(alpha = 0.4f),
+                                Color.Transparent
+                            ),
+                            radius = 1600f
                         )
                     )
-
             )
 
-            Column(
+            // Main Screen Layout Container
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .systemBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = themeColor,
-                    modifier = Modifier.size(80.dp)
-                )
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    title, 
-                    color = Color.White, 
-                    style = MaterialTheme.typography.headlineLarge, 
-                    fontFamily = com.example.notivib.presentation.theme.SourceSerif4,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 2.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    subtitle, 
-                    color = Color.Gray, 
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = com.example.notivib.presentation.theme.HostGrotesk,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(Modifier.height(48.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161618)),
-                    border = BorderStroke(1.dp, themeColor.copy(alpha = 0.3f))
+                // Stacked Hero Column following exact mockup layout
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(top = 42.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("INTERCEPTION RULE", style = MaterialTheme.typography.labelMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
 
-                        Spacer(Modifier.height(8.dp))
+                    // Large Prominent Icon with Ambient Pulse Halo
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(175.dp)
+                                .graphicsLayer {
+                                    alpha = pulseAlpha * 0.60f
+                                    scaleX = pulseScale * 1.15f
+                                    scaleY = pulseScale * 1.15f
+                                }
+                                .background(Color.White.copy(alpha = 0.45f), shape = CircleShape)
+                        )
+                        Icon(
+                            imageVector = themeSpec.icon,
+                            contentDescription = null,
+                            tint = darkColor,
+                            modifier = Modifier
+                                .size(135.dp)
+                                .graphicsLayer {
+                                    scaleX = pulseScale
+                                    scaleY = pulseScale
+                                }
+                        )
+                    }
 
-                        Text(ruleName.ifEmpty { appName }, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                        Spacer(Modifier.height(24.dp))
+                    // Title
+                    Text(
+                        text = themeSpec.title,
+                        color = darkColor,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
 
-                        HorizontalDivider(color = themeColor.copy(alpha = 0.1f))
-                        Spacer(Modifier.height(24.dp))
-                        if (mode == ActiveAlarmService.MODE_INTERCEPT) {
-                            Text("MATCHED KEYWORD", style = MaterialTheme.typography.labelMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Spacer(Modifier.height(8.dp))
-                            Text(keyword, color = Color.White, style = MaterialTheme.typography.titleLarge, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.SemiBold)
-                        } else {
-                            Text("SCHEDULE", style = MaterialTheme.typography.labelMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, color = themeColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Spacer(Modifier.height(8.dp))
-                            Text("Active Interception Phase", color = Color.White, style = MaterialTheme.typography.titleMedium, fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Subtitle
+                    Text(
+                        text = themeSpec.subtitle,
+                        color = darkColor.copy(alpha = 0.95f),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Reduced spacing between subtitle and Interception Title label
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Section Label 1: Interception Title
+                    Text(
+                        text = "Interception Title",
+                        color = darkColor,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Pill 1: Rule / App Pill
+                    RuleAppPill(
+                        ruleName = ruleName,
+                        appName = appName,
+                        darkColor = darkColor
+                    )
+
+                    // Section 2: Matched Keywords or Captcha
+                    if (isFollowUp) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = captcha.prompt,
+                            color = darkColor,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = captchaAnswer,
+                            onValueChange = { captchaAnswer = it },
+                            singleLine = true,
+                            shape = RoundedCornerShape(20.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White,
+                                disabledContainerColor = Color.White,
+                                focusedBorderColor = darkColor,
+                                unfocusedBorderColor = darkColor,
+                                focusedTextColor = darkColor,
+                                unfocusedTextColor = darkColor
+                            ),
+                            textStyle = TextStyle(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                color = darkColor
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .height(56.dp)
+                        )
+                    } else if (mode == ActiveAlarmService.MODE_INTERCEPT) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Matched Keywords",
+                            color = darkColor,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, darkColor),
+                            shadowElevation = 0.dp,
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .height(56.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            ) {
+                                Text(
+                                    text = keyword.replace("|||", ", ").ifEmpty { "Boss, Urgent, @Name" },
+                                    color = darkColor,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
+                    }
 
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Action Button placed directly below pills
+                    Button(
+                        onClick = onAcknowledge,
+                        enabled = isAcknowledgeEnabled,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = darkColor,
+                            disabledContainerColor = darkColor.copy(alpha = 0.4f),
+                            contentColor = themeSpec.backgroundColor,
+                            disabledContentColor = themeSpec.backgroundColor.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(50),
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .height(56.dp)
+                    ) {
+                        Text(
+                            text = "Acknowledge & Dismiss",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeSpec.backgroundColor
+                        )
                     }
                 }
-
-                if (isFollowUp) {
-                    Spacer(Modifier.height(32.dp))
-                    Text(
-                        text = captcha.prompt,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontFamily = com.example.notivib.presentation.theme.HostGrotesk,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = captchaAnswer,
-                        onValueChange = { captchaAnswer = it },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontSize = 16.sp, color = Color.White),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = themeColor,
-                            unfocusedBorderColor = themeColor.copy(alpha = 0.5f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(0.8f)
-                    )
-                }
-
-                Spacer(Modifier.height(64.dp))
-
-                Button(
-                    onClick = onAcknowledge,
-                    enabled = isAcknowledgeEnabled,
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColor, disabledContainerColor = Color.DarkGray),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-                ) {
-                    Text("ACKNOWLEDGE & DISMISS", fontFamily = com.example.notivib.presentation.theme.HostGrotesk, fontWeight = FontWeight.ExtraBold, color = if (mode == ActiveAlarmService.MODE_SCHEDULE_END) Color.Black else Color.White, letterSpacing = 1.sp)
-                }
-
             }
-
         }
-
     }
-
 }
 
 @Preview(showBackground = true)
 @Composable
-fun AlarmScreenPreview() {
-    AlarmScreen(appName = "WhatsApp", keyword = "Emergency", mode = ActiveAlarmService.MODE_INTERCEPT, ruleName = "My Rule", onAcknowledge = {})
+fun AlarmScreenPreviewScheduleStarted() {
+    AlarmScreen(
+        appName = "com.facebook.orca",
+        keyword = "Emergency",
+        mode = ActiveAlarmService.MODE_SCHEDULE_START,
+        ruleName = "",
+        onAcknowledge = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AlarmScreenPreviewScheduleStartedFollowup() {
+    AlarmScreen(
+        appName = "WhatsApp",
+        keyword = "Emergency",
+        mode = ActiveAlarmService.MODE_SCHEDULE_START_FOLLOWUP,
+        ruleName = "Rule Name",
+        onAcknowledge = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AlarmScreenPreviewScheduleEnded() {
+    AlarmScreen(
+        appName = "WhatsApp",
+        keyword = "Emergency",
+        mode = ActiveAlarmService.MODE_SCHEDULE_END,
+        ruleName = "Rule Name",
+        onAcknowledge = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AlarmScreenPreviewInterceptAlert() {
+    AlarmScreen(
+        appName = "com.facebook.orca",
+        keyword = "Boss, Urgent, @Name",
+        mode = ActiveAlarmService.MODE_INTERCEPT,
+        ruleName = "Rule Name",
+        onAcknowledge = {}
+    )
 }

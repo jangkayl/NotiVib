@@ -21,6 +21,7 @@ class ScheduleReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val appName = intent.getStringExtra("APP_NAME") ?: "An App"
         val ruleId = intent.getStringExtra("RULE_ID")
+        val ruleName = intent.getStringExtra("RULE_NAME") ?: ""
         val isStart = intent.getBooleanExtra("IS_START", true)
         val isFollowUp = intent.getBooleanExtra("IS_FOLLOWUP", false)
 
@@ -35,6 +36,7 @@ class ScheduleReminderReceiver : BroadcastReceiver() {
             putExtra("APP_NAME", appName)
             putExtra("KEYWORD", "Schedule")
             putExtra("RULE_ID", ruleId)
+            putExtra("RULE_NAME", ruleName)
             putExtra(ActiveAlarmService.EXTRA_ALARM_MODE, mode)
         }
         
