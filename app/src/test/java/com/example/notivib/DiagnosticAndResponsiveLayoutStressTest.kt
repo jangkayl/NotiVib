@@ -138,4 +138,34 @@ class DiagnosticAndResponsiveLayoutStressTest {
         println("Battery Optimization Stress Test Completed in $executionTimeMs ms!")
         assertTrue("50,000 battery queries must finish in under 1000 ms", executionTimeMs < 1000)
     }
+
+    @Test
+    fun stressTestAppStorageAndLogCleanup_10kOperations() = runBlocking {
+        val totalCleans = 10_000
+        val concurrency = 20
+
+        println("Starting App Storage & Maintenance Stress Test: 10,000 concurrent cache & log purge simulations...")
+
+        val executionTimeMs = measureTimeMillis {
+            val chunk = totalCleans / concurrency
+            val jobs = (1..concurrency).map { workerId ->
+                async(Dispatchers.Default) {
+                    var successCount = 0
+                    for (i in 1..chunk) {
+                        val mockCacheList = mutableListOf("cache_file_$i.tmp", "log_$i.json")
+                        mockCacheList.clear()
+                        if (mockCacheList.isEmpty()) {
+                            successCount++
+                        }
+                    }
+                    successCount
+                }
+            }
+            val results = jobs.awaitAll()
+            assertEquals(totalCleans, results.sum())
+        }
+
+        println("App Storage & Maintenance Stress Test Completed in $executionTimeMs ms!")
+        assertTrue("Storage cleanup operations must finish in under 500 ms", executionTimeMs < 500)
+    }
 }

@@ -51,6 +51,22 @@ fun SettingsScreen(
     onNavigateToLogs: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val logRepository = remember(context) { com.example.notivib.domain.repository.NotificationLogRepository(context.applicationContext) }
+    val systemLogs by logRepository.systemLogs.collectAsState()
+    val interceptLogs by logRepository.logs.collectAsState()
+    var isStorageClearedManually by remember { mutableStateOf(false) }
+
+    fun checkHasCacheFiles(ctx: android.content.Context): Boolean {
+        return try {
+            val f1 = ctx.cacheDir?.listFiles()
+            val f2 = ctx.codeCacheDir?.listFiles()
+            (f1 != null && f1.isNotEmpty()) || (f2 != null && f2.isNotEmpty())
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    val hasDataToClear = !isStorageClearedManually && (systemLogs.isNotEmpty() || interceptLogs.isNotEmpty() || checkHasCacheFiles(context))
     var hasNotificationAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
     var isServiceEnabled by remember {
         mutableStateOf(com.example.notivib.framework.utils.EngineState.isGloballyEnabled(context))
@@ -283,7 +299,53 @@ fun SettingsScreen(
                     }
                 }
             }
-            
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("App Storage & Maintenance", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Clears temporary app cache, system diagnostic logs, and saved notification history in one tap to keep NotiVib lightweight.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            if (hasDataToClear) {
+                                try {
+                                    context.cacheDir?.deleteRecursively()
+                                    context.codeCacheDir?.deleteRecursively()
+                                } catch (e: Exception) {}
+                                logRepository.clearSystemLogs()
+                                logRepository.clearInterceptLogs()
+                                isStorageClearedManually = true
+                                Toast.makeText(context, "App cache, diagnostic logs & history cleared", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Storage and logs are already cleared", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (hasDataToClear) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            contentColor = if (hasDataToClear) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(22.dp)
+                    ) {
+                        Text(
+                            if (hasDataToClear) "Clear Cache & All Logs" else "Already Cleared",
+                            fontFamily = SourceSerif4,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.weight(1f))
 
             // Notification History Link Button (As per Design Mockup)
