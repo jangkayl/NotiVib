@@ -29,6 +29,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.notivib.framework.service.InterceptorService
 import com.example.notivib.framework.utils.BatteryOptimizationHelper
+import com.example.notivib.framework.utils.EngineState
+import com.example.notivib.framework.utils.XiaomiDeviceHelper
 import androidx.compose.foundation.BorderStroke
 import com.example.notivib.presentation.theme.SourceSerif4
 
@@ -204,17 +206,79 @@ fun SettingsScreen(
                         Spacer(Modifier.height(4.dp))
                         Text("Prevents OS from stopping engine during deep sleep.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f))
                         Spacer(Modifier.height(16.dp))
-                        Button(
-                            onClick = { 
-                                try {
-                                    batteryLauncher.launch(BatteryOptimizationHelper.getIgnoreBatteryOptimizationIntent(context))
-                                } catch (e: Exception) {}
-                            },
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
-                            shape = RoundedCornerShape(24.dp)
-                        ) {
-                            Text("Allow Background Usage", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { 
+                                    try {
+                                        batteryLauncher.launch(BatteryOptimizationHelper.getIgnoreBatteryOptimizationIntent(context))
+                                    } catch (e: Exception) {}
+                                },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                                shape = RoundedCornerShape(22.dp)
+                            ) {
+                                Text("Allow Usage", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Button(
+                                onClick = { 
+                                    EngineState.setBatteryOptimizationDismissed(context, true)
+                                    isIgnoringBatteryOptimizations = true
+                                },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                                shape = RoundedCornerShape(22.dp)
+                            ) {
+                                Text("Already Enabled", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (XiaomiDeviceHelper.isXiaomiDevice()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Xiaomi / HyperOS Setup Required", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "HyperOS & MIUI forcefully disconnect notification listeners when apps are closed. Enable Autostart and background permissions to keep NotiVib running.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { 
+                                    try {
+                                        context.startActivity(XiaomiDeviceHelper.getAutostartIntent(context))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Open Settings > Apps > Autostart", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                                shape = RoundedCornerShape(22.dp)
+                            ) {
+                                Text("Autostart", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Button(
+                                onClick = { 
+                                    try {
+                                        context.startActivity(XiaomiDeviceHelper.getMiuiPermissionsIntent(context))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Open App Info > Permissions", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                                shape = RoundedCornerShape(22.dp)
+                            ) {
+                                Text("Pop-Up Perms", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }

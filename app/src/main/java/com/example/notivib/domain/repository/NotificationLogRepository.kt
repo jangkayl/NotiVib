@@ -47,17 +47,19 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]")
     }.stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
 
-    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun addSystemLog(message: String) {
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        val now = java.time.LocalDateTime.now().format(formatter)
+        val now = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        } else {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        }
         val log = "[$now] $message"
         
         scope.launch {
             context.logsDataStore.edit { prefs ->
                 val current = parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]").toMutableList()
                 current.add(0, log)
-                if (current.size > 50) current.removeLast()
+                if (current.size > 100) current.removeLast()
                 prefs[SYSTEM_LOGS_KEY] = serializeSystemLogs(current)
             }
         }
@@ -79,10 +81,17 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun addLog(appName: String, packageName: String, title: String, text: String, matchedRule: String?) {
-        val now = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-        val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val now = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+        } else {
+            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        }
+        val today = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        } else {
+            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        }
         val log = NotificationLog(today, now, appName, packageName, title, text, matchedRule)
         
         scope.launch {

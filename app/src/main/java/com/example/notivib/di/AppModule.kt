@@ -3,6 +3,7 @@ package com.example.notivib.di
 import android.content.Context
 import com.example.notivib.data.local.RulesDataStore
 import com.example.notivib.data.repository.RuleRepositoryImpl
+import com.example.notivib.domain.repository.NotificationLogRepository
 import com.example.notivib.domain.repository.RuleRepository
 import dagger.Module
 import dagger.Provides
@@ -23,7 +24,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideRuleRepository(dataStore: RulesDataStore): RuleRepository {
-        return RuleRepositoryImpl(dataStore)
+    fun provideRuleRepository(
+        dataStore: RulesDataStore,
+        logRepository: NotificationLogRepository
+    ): RuleRepository {
+        return RuleRepositoryImpl(dataStore, logRepository)
     }
 }

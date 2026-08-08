@@ -49,4 +49,14 @@ object EngineState {
     fun setShowForegroundNotification(context: Context, show: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_SHOW_FOREGROUND_NOTIFICATION, show).apply()
     }
+
+    private const val KEY_BATTERY_OPTIMIZATION_DISMISSED = "battery_optimization_dismissed"
+
+    fun isBatteryOptimizationDismissed(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_BATTERY_OPTIMIZATION_DISMISSED, false)
+    }
+
+    fun setBatteryOptimizationDismissed(context: Context, dismissed: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_BATTERY_OPTIMIZATION_DISMISSED, dismissed).apply()
+    }
 }
