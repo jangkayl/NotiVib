@@ -192,6 +192,7 @@ fun EditRuleScreen(
             onDismiss = { showNotificationPermissionDialog = false },
             onContinue = {
                 showNotificationPermissionDialog = false
+                com.example.notivib.framework.utils.EngineState.setNotificationReminderAcknowledged(context, targetPackage)
                 performSave()
             }
         )
@@ -358,7 +359,9 @@ fun EditRuleScreen(
                             return@Button
                         }
 
-                        if (targetPackage != "ANY" && targetPackage.isNotEmpty()) {
+                        val needsReminder = targetPackage != "ANY" && targetPackage.isNotEmpty() &&
+                            !com.example.notivib.framework.utils.EngineState.isNotificationReminderAcknowledged(context, targetPackage)
+                        if (needsReminder) {
                             showNotificationPermissionDialog = true
                         } else {
                             performSave()

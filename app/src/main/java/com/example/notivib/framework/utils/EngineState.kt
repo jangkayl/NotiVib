@@ -50,6 +50,20 @@ object EngineState {
         getPrefs(context).edit().putBoolean(KEY_SHOW_FOREGROUND_NOTIFICATION, show).apply()
     }
 
+    private const val KEY_NOTIF_REMINDER_ACKED = "notif_reminder_acked_packages"
+
+    fun isNotificationReminderAcknowledged(context: Context, packageName: String): Boolean {
+        return getPrefs(context).getStringSet(KEY_NOTIF_REMINDER_ACKED, emptySet())
+            ?.contains(packageName) ?: false
+    }
+
+    fun setNotificationReminderAcknowledged(context: Context, packageName: String) {
+        val current = getPrefs(context).getStringSet(KEY_NOTIF_REMINDER_ACKED, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        current.add(packageName)
+        getPrefs(context).edit().putStringSet(KEY_NOTIF_REMINDER_ACKED, current).apply()
+    }
+
     private const val KEY_BATTERY_OPTIMIZATION_DISMISSED = "battery_optimization_dismissed"
 
     fun isBatteryOptimizationDismissed(context: Context): Boolean {
