@@ -5,8 +5,10 @@ import android.content.ComponentName
 import android.content.Intent
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import androidx.core.app.NotificationCompat
 import com.example.notivib.domain.repository.NotificationLogRepository
 import com.example.notivib.domain.usecase.EvaluateNotificationUseCase
+import com.example.notivib.framework.utils.NotificationTextExtractor
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -70,11 +72,44 @@ class InterceptorService : NotificationListenerService() {
             if (!com.example.notivib.framework.utils.EngineState.shouldIntercept(this)) return // Engine suspended
 
             val extras = it.notification.extras
-            val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
+            val rawTitle = extras.getString(Notification.EXTRA_TITLE) ?: ""
             val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
             val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
             val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
-            val fullText = "$text $bigText $subText".trim()
+            val titleBig = extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString() ?: ""
+
+            // Chat apps (Slack, WhatsApp, Messenger, Telegram, ...) frequently post
+            // MessagingStyle/InboxStyle notifications where the actual message body isn't in
+            // EXTRA_TEXT at all. Pull those sources in too so keyword rules can actually see the
+            // message. Wrapped in try/catch since malformed notifications must never crash the
+            // listener - on failure we simply fall back to the plain-text fields above.
+            var messagingText = ""
+            var conversationTitle = ""
+            var inboxLines: Array<CharSequence>? = null
+            try {
+                val messagingStyle = NotificationCompat.MessagingStyle
+                    .extractMessagingStyleFromNotification(it.notification)
+                if (messagingStyle != null) {
+                    conversationTitle = messagingStyle.conversationTitle?.toString() ?: ""
+                    messagingText = messagingStyle.messages.joinToString(" ") { message ->
+                        val sender = message.person?.name?.toString() ?: ""
+                        val body = message.text?.toString() ?: ""
+                        "$sender $body".trim()
+                    }
+                }
+                inboxLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            } catch (e: Exception) {
+                // Malformed MessagingStyle/InboxStyle data - fall back to plain-text fields only.
+                messagingText = ""
+                conversationTitle = ""
+                inboxLines = null
+            }
+            val inboxText = inboxLines?.joinToString(" ") { it.toString() } ?: ""
+
+            val title = rawTitle.ifEmpty { conversationTitle.ifEmpty { titleBig } }
+            val fullText = NotificationTextExtractor.combine(
+                listOf(text, bigText, subText, titleBig, conversationTitle, messagingText, inboxText)
+            )
 
             var appName = ""
             try {
@@ -107,6 +142,20 @@ class InterceptorService : NotificationListenerService() {
                                 val kwDisplay = com.example.notivib.domain.model.parseKeywords(rule.keyword).joinToString(", ")
                                 "Rule: ${rule.targetPackage.ifEmpty{"Any App"}} / ${kwDisplay.ifEmpty{"Any Keyword"}}"
                             }
+                        )
+                    }
+
+                    // Targeted diagnostic: only for apps the user is actually tracking, and only
+                    // when nothing fired, so this can't flood the 15-entry system log with noise
+                    // from every unrelated notification.
+                    if (evaluationResult is com.example.notivib.domain.usecase.EvaluationResult.Ignore &&
+                        (trackedApps.contains("ALL_APPS") || trackedApps.contains(packageName))
+                    ) {
+                        notificationLogRepository.addSystemLog(
+                            "[Engine Diagnostic] No match for $packageName - " +
+                                "title=${title.isNotEmpty()} text=${text.length} bigText=${bigText.length} " +
+                                "messaging=${messagingText.length} inbox=${inboxText.length} " +
+                                "preview=\"${NotificationTextExtractor.preview(fullText)}\""
                         )
                     }
 
