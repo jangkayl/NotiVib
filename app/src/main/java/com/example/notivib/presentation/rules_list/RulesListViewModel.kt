@@ -48,6 +48,7 @@ class RulesListViewModel @Inject constructor(
 
     val logs: StateFlow<List<NotificationLog>> = notificationLogRepository.logs
     val systemLogs: StateFlow<List<String>> = notificationLogRepository.systemLogs
+    val connectionLogs: StateFlow<List<String>> = notificationLogRepository.connectionLogs
 
     fun saveRule(
         id: String?, 
@@ -130,6 +131,8 @@ class RulesListViewModel @Inject constructor(
         }
     }
 
+    fun logEngineRestart() = notificationLogRepository.addSystemLog("[Engine Diagnostic] Engine restarted by user")
+    fun clearConnectionLogs() = notificationLogRepository.clearConnectionLogs()
     fun clearSystemLogs() = notificationLogRepository.clearSystemLogs()
     fun deleteSystemLog(log: String) = notificationLogRepository.deleteSystemLog(log)
     fun clearInterceptLogs() = notificationLogRepository.clearInterceptLogs()

@@ -215,6 +215,7 @@ fun RulesListScreen(
     val rules by viewModel.rules.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val systemLogs by viewModel.systemLogs.collectAsState()
+    val connectionLogs by viewModel.connectionLogs.collectAsState()
     var selectedTabIndex by remember { mutableStateOf(0) }
     val activeRules = rules.filter { it.isActive }
     val inactiveRules = rules.filter { !it.isActive }
@@ -645,7 +646,68 @@ fun RulesListScreen(
 
                         }
 
+                        if (connectionLogs.isNotEmpty()) {
+
+                            Spacer(Modifier.height(16.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+
+                                Text("Connection History", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+
+                                IconButton(onClick = { viewModel.clearConnectionLogs() }) {
+                                    Icon(Icons.Outlined.Close, contentDescription = "Clear Connection History", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                }
+
+                            }
+
+                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp)) {
+
+                                items(connectionLogs) { log ->
+
+                                    Text(log, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+
+                                }
+
+                            }
+
+                        }
+
                         Spacer(Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                if (com.example.notivib.framework.utils.EngineState.isShowForegroundNotification(context)) {
+                                    // Foreground notification is enabled: let the service rebind, redraw the
+                                    // healthy banner, and log the restart diagnostic itself.
+                                    val restartIntent = Intent(context, com.example.notivib.framework.service.EngineForegroundService::class.java).apply {
+                                        action = com.example.notivib.framework.service.EngineForegroundService.ACTION_RESTART
+                                    }
+                                    context.startForegroundService(restartIntent)
+                                } else {
+                                    // User disabled the persistent notification: rebind + log directly without
+                                    // forcing a foreground-service banner they opted out of.
+                                    try {
+                                        NotificationListenerService.requestRebind(
+                                            ComponentName(context, com.example.notivib.framework.service.InterceptorService::class.java)
+                                        )
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                    viewModel.logEngineRestart()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+
+                            Text("Restart Engine", fontWeight = FontWeight.Bold)
+
+                        }
+
+                        Spacer(Modifier.height(12.dp))
 
                         Button(onClick = { showSystemLogsDialog = false }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
 
