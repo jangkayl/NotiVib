@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -31,8 +32,12 @@ import com.example.notivib.framework.service.InterceptorService
 import com.example.notivib.framework.utils.BatteryOptimizationHelper
 import com.example.notivib.framework.utils.EngineState
 import com.example.notivib.framework.utils.XiaomiDeviceHelper
+import com.example.notivib.presentation.rules_list.RulesListViewModel
 import androidx.compose.foundation.BorderStroke
 import com.example.notivib.presentation.theme.SourceSerif4
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 
 fun checkNotificationAccess(context: android.content.Context): Boolean {
     return try {
@@ -48,7 +53,8 @@ fun checkNotificationAccess(context: android.content.Context): Boolean {
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToLogs: () -> Unit = {}
+    onNavigateToLogs: () -> Unit = {},
+    rulesViewModel: RulesListViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val logRepository = remember(context) { com.example.notivib.domain.repository.NotificationLogRepository(context.applicationContext) }
@@ -106,7 +112,47 @@ fun SettingsScreen(
     ) { isGranted ->
         permissionGrantedState = isGranted
     }
-    
+
+    val exportRulesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        rulesViewModel.exportRules { json ->
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    OutputStreamWriter(stream).use { it.write(json) }
+                }
+                Toast.makeText(context, "Rules exported", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to export rules", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importRulesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val json = try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BufferedReader(InputStreamReader(stream)).readText()
+            }
+        } catch (e: Exception) {
+            null
+        }
+        if (json == null) {
+            Toast.makeText(context, "Failed to read file", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        rulesViewModel.importRules(json) { result ->
+            result.onSuccess { count ->
+                Toast.makeText(context, "Imported $count rule(s)", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Failed to import rules: invalid file", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -295,6 +341,41 @@ fun SettingsScreen(
                             ) {
                                 Text("Pop-Up Perms", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                             }
+                        }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Backup & Restore Rules", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Save all your rules to a file, or restore them on this or another device. Importing merges with your existing rules by matching id.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { exportRulesLauncher.launch("notivib_rules_backup.json") },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                            shape = RoundedCornerShape(22.dp)
+                        ) {
+                            Text("Export Rules", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Button(
+                            onClick = { importRulesLauncher.launch(arrayOf("application/json")) },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.background),
+                            shape = RoundedCornerShape(22.dp)
+                        ) {
+                            Text("Import Rules", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
