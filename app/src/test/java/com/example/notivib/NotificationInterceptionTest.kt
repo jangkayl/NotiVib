@@ -126,4 +126,85 @@ class NotificationInterceptionTest {
 
         assertTrue(result is EvaluationResult.Ignore)
     }
+
+    @Test
+    fun testAppMatching_doesNotMatchPartialOrSubstringPackage() = runBlocking {
+        val rule = AlarmRule(
+            id = "5",
+            ruleName = "WhatsApp Only",
+            targetPackage = "com.whatsapp",
+            keyword = "",
+            activeDays = setOf(currentDay),
+            startTimeMinute = 0,
+            endTimeMinute = 1439
+        )
+        val repo = FakeRuleRepository(listOf(rule))
+        val useCase = EvaluateNotificationUseCase(repo)
+
+        // Superstring package (e.g. WhatsApp Business) must NOT match "com.whatsapp"
+        val businessResult = useCase.evaluate(
+            packageName = "com.whatsapp.business",
+            appName = "WhatsApp Business",
+            title = "Urgent",
+            text = "Hello"
+        )
+        assertTrue(businessResult is EvaluationResult.Ignore)
+
+        // Substring package ("com") must NOT match "com.whatsapp"
+        val substringResult = useCase.evaluate(
+            packageName = "com",
+            appName = "com",
+            title = "Urgent",
+            text = "Hello"
+        )
+        assertTrue(substringResult is EvaluationResult.Ignore)
+    }
+
+    @Test
+    fun testAppMatching_matchesExactPackageName() = runBlocking {
+        val rule = AlarmRule(
+            id = "6",
+            ruleName = "WhatsApp Only",
+            targetPackage = "com.whatsapp",
+            keyword = "urgent",
+            activeDays = setOf(currentDay),
+            startTimeMinute = 0,
+            endTimeMinute = 1439
+        )
+        val repo = FakeRuleRepository(listOf(rule))
+        val useCase = EvaluateNotificationUseCase(repo)
+
+        val result = useCase.evaluate(
+            packageName = "com.whatsapp",
+            appName = "WhatsApp",
+            title = "Urgent message",
+            text = "Hello"
+        )
+
+        assertTrue(result is EvaluationResult.TriggerAlarm)
+    }
+
+    @Test
+    fun testAppMatching_anyAppStillMatchesEverything() = runBlocking {
+        val rule = AlarmRule(
+            id = "7",
+            ruleName = "Any App Rule",
+            targetPackage = "ANY",
+            keyword = "urgent",
+            activeDays = setOf(currentDay),
+            startTimeMinute = 0,
+            endTimeMinute = 1439
+        )
+        val repo = FakeRuleRepository(listOf(rule))
+        val useCase = EvaluateNotificationUseCase(repo)
+
+        val result = useCase.evaluate(
+            packageName = "com.whatsapp.business",
+            appName = "WhatsApp Business",
+            title = "Urgent message",
+            text = "Hello"
+        )
+
+        assertTrue(result is EvaluationResult.TriggerAlarm)
+    }
 }

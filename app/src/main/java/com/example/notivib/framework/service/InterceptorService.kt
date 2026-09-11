@@ -67,6 +67,7 @@ class InterceptorService : NotificationListenerService() {
         sbn?.let {
             val packageName = it.packageName ?: return
             if (packageName == this.packageName) return // Ignore self
+            if (!com.example.notivib.framework.utils.EngineState.shouldIntercept(this)) return // Engine suspended
 
             val extras = it.notification.extras
             val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
