@@ -96,6 +96,16 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
         }
     }
 
+    fun deleteConnectionLog(log: String) {
+        scope.launch {
+            context.logsDataStore.edit { prefs ->
+                val current = parseSystemLogs(prefs[CONNECTION_LOGS_KEY] ?: "[]").toMutableList()
+                current.remove(log)
+                prefs[CONNECTION_LOGS_KEY] = serializeSystemLogs(current)
+            }
+        }
+    }
+
     fun clearConnectionLogs() {
         scope.launch {
             context.logsDataStore.edit { prefs -> prefs[CONNECTION_LOGS_KEY] = "[]" }

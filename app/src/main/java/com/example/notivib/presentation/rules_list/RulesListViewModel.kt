@@ -133,6 +133,7 @@ class RulesListViewModel @Inject constructor(
 
     fun logEngineRestart() = notificationLogRepository.addSystemLog("[Engine Diagnostic] Engine restarted by user")
     fun clearConnectionLogs() = notificationLogRepository.clearConnectionLogs()
+    fun deleteConnectionLog(log: String) = notificationLogRepository.deleteConnectionLog(log)
     fun clearSystemLogs() = notificationLogRepository.clearSystemLogs()
     fun deleteSystemLog(log: String) = notificationLogRepository.deleteSystemLog(log)
     fun clearInterceptLogs() = notificationLogRepository.clearInterceptLogs()

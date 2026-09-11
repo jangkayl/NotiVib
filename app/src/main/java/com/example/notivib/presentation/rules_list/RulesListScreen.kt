@@ -29,6 +29,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 
 import androidx.compose.foundation.clickable
 
@@ -596,7 +597,7 @@ fun RulesListScreen(
 
                             Text("Engine Diagnostics", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
 
-                            IconButton(onClick = { viewModel.clearSystemLogs() }) {
+                            IconButton(onClick = { viewModel.clearSystemLogs(); viewModel.clearConnectionLogs() }) {
                                 Icon(Icons.Outlined.CleaningServices, contentDescription = "Clear All", tint = Color.Red)
                             }
 
@@ -604,7 +605,15 @@ fun RulesListScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        if (systemLogs.isEmpty()) {
+                        // Merge both buffers for display (they stay separate underneath so connection
+                        // churn never evicts real errors). isConnection=true tags the green rows;
+                        // "[Engine Error]" tags the red interruption rows; everything else is neutral.
+                        val mergedLogs = remember(systemLogs, connectionLogs) {
+                            (systemLogs.map { it to false } + connectionLogs.map { it to true })
+                                .sortedByDescending { it.first }
+                        }
+
+                        if (mergedLogs.isEmpty()) {
 
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
 
@@ -614,13 +623,27 @@ fun RulesListScreen(
 
                         } else {
 
-                            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
 
-                                items(systemLogs) { log ->
+                                items(mergedLogs) { (log, isConnection) ->
+
+                                    val isError = !isConnection && log.contains("[Engine Error]")
+                                    val rowBg = when {
+                                        isConnection -> Color(0xFFD9FF0B).copy(alpha = 0.15f)
+                                        isError -> Color(0xFFFF5252).copy(alpha = 0.20f)
+                                        else -> Color.White.copy(alpha = 0.04f)
+                                    }
 
                                     Row(
 
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(rowBg)
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
 
                                         horizontalArrangement = Arrangement.SpaceBetween,
 
@@ -630,43 +653,16 @@ fun RulesListScreen(
 
                                         Text(log, style = MaterialTheme.typography.bodySmall, color = Color.White, modifier = Modifier.weight(1f))
 
-                                        IconButton(onClick = { viewModel.deleteSystemLog(log) }) {
+                                        IconButton(
+                                            onClick = { if (isConnection) viewModel.deleteConnectionLog(log) else viewModel.deleteSystemLog(log) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
 
-                                            Icon(Icons.Outlined.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Outlined.Close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
 
                                         }
 
                                     }
-
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
-
-                                }
-
-                            }
-
-                        }
-
-                        if (connectionLogs.isNotEmpty()) {
-
-                            Spacer(Modifier.height(16.dp))
-
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-
-                                Text("Connection History", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-
-                                IconButton(onClick = { viewModel.clearConnectionLogs() }) {
-                                    Icon(Icons.Outlined.Close, contentDescription = "Clear Connection History", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
-                                }
-
-                            }
-
-                            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp)) {
-
-                                items(connectionLogs) { log ->
-
-                                    Text(log, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
-
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
 
                                 }
 
@@ -700,14 +696,14 @@ fun RulesListScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White)
                         ) {
 
                             Text("Restart Engine", fontWeight = FontWeight.Bold)
 
                         }
 
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(6.dp))
 
                         Button(onClick = { showSystemLogsDialog = false }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
 
