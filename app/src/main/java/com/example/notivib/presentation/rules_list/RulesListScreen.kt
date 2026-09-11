@@ -608,6 +608,7 @@ fun RulesListScreen(
                         // Merge both buffers for display (they stay separate underneath so connection
                         // churn never evicts real errors). isConnection=true tags the green rows;
                         // "[Engine Error]" tags the red interruption rows; everything else is neutral.
+                        var diagLogsShown by remember { mutableStateOf(12) }
                         val mergedLogs = remember(systemLogs, connectionLogs) {
                             (systemLogs.map { it to false } + connectionLogs.map { it to true })
                                 .sortedByDescending { it.first }
@@ -623,16 +624,19 @@ fun RulesListScreen(
 
                         } else {
 
+                            val visibleLogs = mergedLogs.take(diagLogsShown)
+
                             LazyColumn(
                                 modifier = Modifier.fillMaxWidth().weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
 
-                                items(mergedLogs) { (log, isConnection) ->
+                                items(visibleLogs, key = { it.first }, contentType = { "log" }) { (log, isConnection) ->
 
                                     val isError = !isConnection && log.contains("[Engine Error]")
+                                    val isPositive = !isConnection && (log.contains("restarted") || log.contains("restored"))
                                     val rowBg = when {
-                                        isConnection -> Color(0xFFD9FF0B).copy(alpha = 0.15f)
+                                        isConnection || isPositive -> Color(0xFFD9FF0B).copy(alpha = 0.15f)
                                         isError -> Color(0xFFFF5252).copy(alpha = 0.20f)
                                         else -> Color.White.copy(alpha = 0.04f)
                                     }
@@ -666,6 +670,16 @@ fun RulesListScreen(
 
                                 }
 
+                                if (diagLogsShown < mergedLogs.size) {
+                                    item(key = "load_more") {
+                                        Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                                            TextButton(onClick = { diagLogsShown += 12 }) {
+                                                Text("Load More", color = Color(0xFFD9FF0B), fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
                             }
 
                         }
@@ -696,7 +710,7 @@ fun RulesListScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9FF0B), contentColor = Color.Black)
                         ) {
 
                             Text("Restart Engine", fontWeight = FontWeight.Bold)
