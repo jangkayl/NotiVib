@@ -29,6 +29,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 
 import androidx.compose.foundation.clickable
 
@@ -45,6 +46,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
 
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 
 import androidx.compose.foundation.shape.CircleShape
 
@@ -215,6 +217,7 @@ fun RulesListScreen(
     val rules by viewModel.rules.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val systemLogs by viewModel.systemLogs.collectAsState()
+    val connectionLogs by viewModel.connectionLogs.collectAsState()
     var selectedTabIndex by remember { mutableStateOf(0) }
     val activeRules = rules.filter { it.isActive }
     val inactiveRules = rules.filter { !it.isActive }
@@ -595,7 +598,7 @@ fun RulesListScreen(
 
                             Text("Engine Diagnostics", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
 
-                            IconButton(onClick = { viewModel.clearSystemLogs() }) {
+                            IconButton(onClick = { viewModel.clearSystemLogs(); viewModel.clearConnectionLogs() }) {
                                 Icon(Icons.Outlined.CleaningServices, contentDescription = "Clear All", tint = Color.Red)
                             }
 
@@ -603,7 +606,16 @@ fun RulesListScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        if (systemLogs.isEmpty()) {
+                        // Merge both buffers for display (they stay separate underneath so connection
+                        // churn never evicts real errors). isConnection=true tags the green rows;
+                        // "[Engine Error]" tags the red interruption rows; everything else is neutral.
+                        var diagLogsShown by remember { mutableStateOf(12) }
+                        val mergedLogs = remember(systemLogs, connectionLogs) {
+                            (systemLogs.map { it to false } + connectionLogs.map { it to true })
+                                .sortedByDescending { it.first }
+                        }
+
+                        if (mergedLogs.isEmpty()) {
 
                             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
 
@@ -613,13 +625,30 @@ fun RulesListScreen(
 
                         } else {
 
-                            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            val visibleLogs = mergedLogs.take(diagLogsShown)
 
-                                items(systemLogs) { log ->
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+
+                                itemsIndexed(visibleLogs, key = { index, _ -> index }, contentType = { _, _ -> "log" }) { _, (log, isConnection) ->
+
+                                    val isError = !isConnection && log.contains("[Engine Error]")
+                                    val isPositive = !isConnection && (log.contains("restarted") || log.contains("restored"))
+                                    val rowBg = when {
+                                        isConnection || isPositive -> Color(0xFFD9FF0B).copy(alpha = 0.15f)
+                                        isError -> Color(0xFFFF5252).copy(alpha = 0.20f)
+                                        else -> Color.White.copy(alpha = 0.04f)
+                                    }
 
                                     Row(
 
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(rowBg)
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
 
                                         horizontalArrangement = Arrangement.SpaceBetween,
 
@@ -629,16 +658,27 @@ fun RulesListScreen(
 
                                         Text(log, style = MaterialTheme.typography.bodySmall, color = Color.White, modifier = Modifier.weight(1f))
 
-                                        IconButton(onClick = { viewModel.deleteSystemLog(log) }) {
+                                        IconButton(
+                                            onClick = { if (isConnection) viewModel.deleteConnectionLog(log) else viewModel.deleteSystemLog(log) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
 
-                                            Icon(Icons.Outlined.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Outlined.Close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
 
                                         }
 
                                     }
 
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                                }
 
+                                if (diagLogsShown < mergedLogs.size) {
+                                    item(key = "load_more") {
+                                        Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                                            TextButton(onClick = { diagLogsShown += 12 }) {
+                                                Text("Load More", color = Color(0xFFD9FF0B), fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
                                 }
 
                             }
@@ -646,6 +686,39 @@ fun RulesListScreen(
                         }
 
                         Spacer(Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                if (com.example.notivib.framework.utils.EngineState.isShowForegroundNotification(context)) {
+                                    // Foreground notification is enabled: let the service rebind, redraw the
+                                    // healthy banner, and log the restart diagnostic itself.
+                                    val restartIntent = Intent(context, com.example.notivib.framework.service.EngineForegroundService::class.java).apply {
+                                        action = com.example.notivib.framework.service.EngineForegroundService.ACTION_RESTART
+                                    }
+                                    context.startForegroundService(restartIntent)
+                                } else {
+                                    // User disabled the persistent notification: rebind + log directly without
+                                    // forcing a foreground-service banner they opted out of.
+                                    try {
+                                        NotificationListenerService.requestRebind(
+                                            ComponentName(context, com.example.notivib.framework.service.InterceptorService::class.java)
+                                        )
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                    viewModel.logEngineRestart()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9FF0B), contentColor = Color.Black)
+                        ) {
+
+                            Text("Restart Engine", fontWeight = FontWeight.Bold)
+
+                        }
+
+                        Spacer(Modifier.height(6.dp))
 
                         Button(onClick = { showSystemLogsDialog = false }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) {
 

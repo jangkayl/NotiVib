@@ -1,6 +1,9 @@
 package com.example.notivib.presentation.rules_list
 
+import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -160,6 +163,40 @@ fun EditRuleScreen(
     }
 
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showNotificationPermissionDialog by remember { mutableStateOf(false) }
+
+    val performSave = {
+        viewModel.saveRule(
+            id = rule?.id,
+            ruleName = ruleName,
+            targetPackage = targetPackage,
+            keyword = keywordChips.joinToString("|||"),
+            startTimeMinute = startTimeMinute,
+            endTimeMinute = endTimeMinute,
+            vibrationOnly = vibrationOnly,
+            isActive = rule?.isActive ?: true,
+            activeDays = activeDays,
+            hasCustomTimeWindows = hasCustomTimeWindows,
+            customTimeWindows = customTimeWindows,
+            muteOutsideSchedule = muteOutsideSchedule,
+            remindSchedule = remindSchedule,
+            ignoredKeywords = ignoredKeywordChips.joinToString("|||")
+        )
+        onNavigateBack()
+    }
+
+    if (showNotificationPermissionDialog) {
+        NotificationPermissionDialog(
+            appName = appName,
+            targetPackage = targetPackage,
+            onDismiss = { showNotificationPermissionDialog = false },
+            onContinue = {
+                showNotificationPermissionDialog = false
+                com.example.notivib.framework.utils.EngineState.setNotificationReminderAcknowledged(context, targetPackage)
+                performSave()
+            }
+        )
+    }
 
     if (showDeleteConfirmDialog) {
         AlertDialog(
@@ -322,23 +359,13 @@ fun EditRuleScreen(
                             return@Button
                         }
 
-                        viewModel.saveRule(
-                            id = rule?.id,
-                            ruleName = ruleName,
-                            targetPackage = targetPackage,
-                            keyword = keywordChips.joinToString("|||"),
-                            startTimeMinute = startTimeMinute,
-                            endTimeMinute = endTimeMinute,
-                            vibrationOnly = vibrationOnly,
-                            isActive = rule?.isActive ?: true,
-                            activeDays = activeDays,
-                            hasCustomTimeWindows = hasCustomTimeWindows,
-                            customTimeWindows = customTimeWindows,
-                            muteOutsideSchedule = muteOutsideSchedule,
-                            remindSchedule = remindSchedule,
-                            ignoredKeywords = ignoredKeywordChips.joinToString("|||")
-                        )
-                        onNavigateBack()
+                        val needsReminder = targetPackage != "ANY" && targetPackage.isNotEmpty() &&
+                            !com.example.notivib.framework.utils.EngineState.isNotificationReminderAcknowledged(context, targetPackage)
+                        if (needsReminder) {
+                            showNotificationPermissionDialog = true
+                        } else {
+                            performSave()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.Black),
                     shape = RoundedCornerShape(16.dp),
@@ -728,6 +755,69 @@ fun EditRuleScreen(
             Spacer(Modifier.height(48.dp)) // Extra padding at the bottom so it's not hidden by the bottom bar
         }
     }
+}
+
+@Composable
+fun NotificationPermissionDialog(
+    appName: String,
+    targetPackage: String,
+    onDismiss: () -> Unit,
+    onContinue: () -> Unit
+) {
+    val context = LocalContext.current
+    val accentColor = Color(0xFFD9FF0B)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF20201E),
+        title = {
+            Text(
+                "Enable Notifications for $appName",
+                fontFamily = SourceSerif4,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        },
+        text = {
+            Text(
+                "For this rule to work, notifications for $appName must be enabled. If they're turned off, NotiVib won't receive them and this rule will never trigger.",
+                color = Color.White.copy(alpha = 0.8f),
+                fontFamily = HostGrotesk
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    try {
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, targetPackage)
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        try {
+                            val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                .setData(Uri.parse("package:$targetPackage"))
+                            context.startActivity(fallbackIntent)
+                        } catch (e2: Exception) {
+                            android.widget.Toast.makeText(context, "Unable to open settings for $appName", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color(0xFF20201E)),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Text("Open $appName Settings", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onContinue,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray, contentColor = Color.White),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Text("Save Anyway", fontFamily = SourceSerif4, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable

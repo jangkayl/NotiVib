@@ -36,6 +36,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
     
     private val INTERCEPT_LOGS_KEY = stringPreferencesKey("intercept_logs")
     private val SYSTEM_LOGS_KEY = stringPreferencesKey("system_logs")
+    private val CONNECTION_LOGS_KEY = stringPreferencesKey("connection_logs")
 
     private val scope = CoroutineScope(Dispatchers.IO)
 
@@ -45,6 +46,12 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
 
     val systemLogs: StateFlow<List<String>> = context.logsDataStore.data.map { prefs ->
         parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]")
+    }.stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
+
+    // Routine listener connect/disconnect churn is noisy on some OEMs. It lives in its own
+    // larger buffer so it never evicts real errors/restarts from the 15-entry diagnostics log.
+    val connectionLogs: StateFlow<List<String>> = context.logsDataStore.data.map { prefs ->
+        parseSystemLogs(prefs[CONNECTION_LOGS_KEY] ?: "[]")
     }.stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
 
     fun addSystemLog(message: String) {
@@ -59,9 +66,49 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
             context.logsDataStore.edit { prefs ->
                 val current = parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]").toMutableList()
                 current.add(0, log)
-                if (current.size > 100) current.removeLast()
+                if (current.size > 15) {
+                    val dropFrom = maxOf(0, current.size - 5)
+                    current.subList(dropFrom, current.size).clear()
+                }
                 prefs[SYSTEM_LOGS_KEY] = serializeSystemLogs(current)
             }
+        }
+    }
+
+    fun addConnectionLog(message: String) {
+        val now = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        } else {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        }
+        val log = "[$now] $message"
+
+        scope.launch {
+            context.logsDataStore.edit { prefs ->
+                val current = parseSystemLogs(prefs[CONNECTION_LOGS_KEY] ?: "[]").toMutableList()
+                current.add(0, log)
+                if (current.size > 50) {
+                    val dropFrom = maxOf(0, current.size - 10)
+                    current.subList(dropFrom, current.size).clear()
+                }
+                prefs[CONNECTION_LOGS_KEY] = serializeSystemLogs(current)
+            }
+        }
+    }
+
+    fun deleteConnectionLog(log: String) {
+        scope.launch {
+            context.logsDataStore.edit { prefs ->
+                val current = parseSystemLogs(prefs[CONNECTION_LOGS_KEY] ?: "[]").toMutableList()
+                current.remove(log)
+                prefs[CONNECTION_LOGS_KEY] = serializeSystemLogs(current)
+            }
+        }
+    }
+
+    fun clearConnectionLogs() {
+        scope.launch {
+            context.logsDataStore.edit { prefs -> prefs[CONNECTION_LOGS_KEY] = "[]" }
         }
     }
 
