@@ -9,7 +9,9 @@ import com.example.notivib.domain.model.TimeWindow
 import com.example.notivib.domain.repository.NotificationLog
 import com.example.notivib.domain.repository.NotificationLogRepository
 import com.example.notivib.domain.usecase.DeleteRuleUseCase
+import com.example.notivib.domain.usecase.ExportRulesUseCase
 import com.example.notivib.domain.usecase.GetRulesUseCase
+import com.example.notivib.domain.usecase.ImportRulesUseCase
 import com.example.notivib.domain.usecase.SaveRuleUseCase
 import com.example.notivib.domain.manager.ScheduleReminderManager
 import com.example.notivib.framework.receiver.ScheduleReceiver
@@ -27,6 +29,8 @@ class RulesListViewModel @Inject constructor(
     private val getRulesUseCase: GetRulesUseCase,
     private val saveRuleUseCase: SaveRuleUseCase,
     private val deleteRuleUseCase: DeleteRuleUseCase,
+    private val exportRulesUseCase: ExportRulesUseCase,
+    private val importRulesUseCase: ImportRulesUseCase,
     private val notificationLogRepository: NotificationLogRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -128,6 +132,31 @@ class RulesListViewModel @Inject constructor(
             deleteRuleUseCase(ruleId)
             triggerEvaluation()
             ScheduleReminderManager.cancelAlarm(context, ruleId)
+        }
+    }
+
+    /** Serializes all current rules to a JSON string for the user to save via SAF. */
+    fun exportRules(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            onResult(exportRulesUseCase())
+        }
+    }
+
+    /**
+     * Imports rules from a JSON backup string, merging by rule id (existing ids are replaced,
+     * new ids are added; existing rules absent from the file are left alone). On success,
+     * reschedules reminders for every current rule and returns the number of rules imported.
+     * On failure (malformed JSON), nothing is changed.
+     */
+    fun importRules(json: String, onResult: (Result<Int>) -> Unit) {
+        viewModelScope.launch {
+            val result = importRulesUseCase(json)
+            if (result.isSuccess) {
+                triggerEvaluation()
+                val updatedRules = getRulesUseCase().firstOrNull() ?: emptyList()
+                updatedRules.forEach { ScheduleReminderManager.scheduleForRule(context, it) }
+            }
+            onResult(result)
         }
     }
 

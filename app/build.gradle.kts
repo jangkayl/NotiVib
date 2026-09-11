@@ -92,4 +92,8 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    // Real org.json implementation for unit tests: the android.jar on the unit test
+    // classpath stubs org.json.* to throw, so code exercising RuleSerialization (pure
+    // org.json, no Android types) needs a working implementation here.
+    testImplementation("org.json:json:20240303")
 }
