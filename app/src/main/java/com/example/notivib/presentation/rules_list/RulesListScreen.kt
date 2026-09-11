@@ -46,6 +46,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
 
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 
 import androidx.compose.foundation.shape.CircleShape
 
@@ -631,7 +632,7 @@ fun RulesListScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
 
-                                items(visibleLogs, key = { it.first }, contentType = { "log" }) { (log, isConnection) ->
+                                itemsIndexed(visibleLogs, key = { index, _ -> index }, contentType = { _, _ -> "log" }) { _, (log, isConnection) ->
 
                                     val isError = !isConnection && log.contains("[Engine Error]")
                                     val isPositive = !isConnection && (log.contains("restarted") || log.contains("restored"))
