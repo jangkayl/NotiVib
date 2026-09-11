@@ -9,12 +9,26 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        Package-visibility scoped query (replaces QUERY_ALL_PACKAGES, a Google Play distribution
+        blocker). The rule editor's app picker (RulesListScreen.getInstalledApps) enumerates
+        launcher apps via queryIntentActivities on this exact intent, so declaring it here is
+        sufficient to keep the picker's launcher-app enumeration and per-package icon/label
+        lookups for those apps working under scoped visibility.
+        See docs/play-query-all-packages.md for the full analysis and known tradeoffs.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:name=".NotiVibApp"
