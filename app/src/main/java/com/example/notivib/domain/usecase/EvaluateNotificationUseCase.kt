@@ -29,8 +29,8 @@ class EvaluateNotificationUseCase @Inject constructor(
             
             val isAnyApp = rule.targetPackage == "ANY" || rule.targetPackage.isEmpty()
             val matchApp = isAnyApp || (
-                           packageName.contains(rule.targetPackage, ignoreCase = true) ||
-                           appName.contains(rule.targetPackage, ignoreCase = true))
+                           packageName.equals(rule.targetPackage, ignoreCase = true) ||
+                           appName.equals(rule.targetPackage, ignoreCase = true))
 
             if (!matchApp) continue
 
