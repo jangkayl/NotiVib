@@ -14,6 +14,15 @@ object BatteryOptimizationHelper {
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
 
+    /**
+     * The real OS-reported state, ignoring [EngineState.isBatteryOptimizationDismissed] — used
+     * for diagnostics logging where masking the real state would be misleading.
+     */
+    fun isReallyIgnoring(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
     fun getIgnoreBatteryOptimizationIntent(context: Context): Intent {
         return Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
             data = Uri.parse("package:${context.packageName}")

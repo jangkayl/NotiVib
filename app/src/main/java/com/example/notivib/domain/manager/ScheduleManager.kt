@@ -4,9 +4,11 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import com.example.notivib.domain.model.AlarmRule
 import com.example.notivib.framework.receiver.ScheduleReceiver
+import com.example.notivib.framework.utils.ReminderDiagnostics
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -64,10 +66,13 @@ object ScheduleManager {
                 
                 if (rule.activeDays.contains(dayOfWeek)) {
                     val startMin = getStartMinute(rule, dayOfWeek)
-                    val nextStart = targetDay.withHour(startMin / 60).withMinute(startMin % 60).withSecond(0).withNano(0)
-                    
+                    // Built via atStartOfDay().plusMinutes(...) rather than withHour/withMinute so
+                    // a full-day rule's end minute of 1440 doesn't throw DateTimeException
+                    // (withHour(24) is invalid).
+                    val nextStart = targetDay.toLocalDate().atStartOfDay().plusMinutes(startMin.toLong())
+
                     val endMin = getEndMinute(rule, dayOfWeek)
-                    var nextEnd = targetDay.withHour(endMin / 60).withMinute(endMin % 60).withSecond(0).withNano(0)
+                    var nextEnd = targetDay.toLocalDate().atStartOfDay().plusMinutes(endMin.toLong())
                     if (startMin > endMin) {
                         nextEnd = nextEnd.plusDays(1)
                     }
@@ -120,11 +125,27 @@ object ScheduleManager {
 
         val triggerAtMillis = time.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         try {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            if (!canScheduleExact(alarmManager)) {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+                ReminderDiagnostics.log(
+                    context,
+                    "[Engine Diagnostic] Exact alarm not permitted — using inexact alarm for next schedule evaluation"
+                )
+            } else {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            }
             Log.d("ScheduleManager", "Scheduled next evaluation at $time")
         } catch (e: SecurityException) {
             // Missing SCHEDULE_EXACT_ALARM permission
-            e.printStackTrace()
+            ReminderDiagnostics.log(context, "[Engine Diagnostic] Failed to schedule next evaluation: ${e.message}")
+        }
+    }
+
+    private fun canScheduleExact(alarmManager: AlarmManager): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
         }
     }
 

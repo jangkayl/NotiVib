@@ -49,7 +49,7 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
     }.stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
 
     // Routine listener connect/disconnect churn is noisy on some OEMs. It lives in its own
-    // larger buffer so it never evicts real errors/restarts from the 15-entry diagnostics log.
+    // larger buffer so it never evicts real errors/restarts from the 50-entry diagnostics log.
     val connectionLogs: StateFlow<List<String>> = context.logsDataStore.data.map { prefs ->
         parseSystemLogs(prefs[CONNECTION_LOGS_KEY] ?: "[]")
     }.stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
@@ -66,8 +66,8 @@ class NotificationLogRepository @Inject constructor(@ApplicationContext private 
             context.logsDataStore.edit { prefs ->
                 val current = parseSystemLogs(prefs[SYSTEM_LOGS_KEY] ?: "[]").toMutableList()
                 current.add(0, log)
-                if (current.size > 15) {
-                    val dropFrom = maxOf(0, current.size - 5)
+                if (current.size > 50) {
+                    val dropFrom = maxOf(0, current.size - 10)
                     current.subList(dropFrom, current.size).clear()
                 }
                 prefs[SYSTEM_LOGS_KEY] = serializeSystemLogs(current)

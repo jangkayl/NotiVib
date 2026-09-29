@@ -15,18 +15,21 @@ class BootReceiver : BroadcastReceiver() {
     lateinit var notificationLogRepository: NotificationLogRepository
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
-            intent.action != "android.intent.action.LOCKED_BOOT_COMPLETED"
-        ) {
-            return
+        val reason = when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED, "android.intent.action.LOCKED_BOOT_COMPLETED" -> "boot"
+            Intent.ACTION_MY_PACKAGE_REPLACED -> "app update"
+            Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_TIME_CHANGED -> "time change"
+            else -> return
         }
 
-        if (!EngineState.isGloballyEnabled(context)) return
-
-        // Re-establish schedules + foreground service the same way ScheduleReceiver does.
+        // Reminders must be re-armed even if the engine is off — ScheduleReceiver already stops
+        // the foreground service in that case, so re-arming here doesn't turn the engine back on.
         val scheduleIntent = Intent(context, ScheduleReceiver::class.java)
         context.sendBroadcast(scheduleIntent)
 
-        notificationLogRepository.addSystemLog("[Engine Diagnostic] Device rebooted — engine restored")
+        if (reason == "boot" && EngineState.isGloballyEnabled(context)) {
+            notificationLogRepository.addSystemLog("[Engine Diagnostic] Device rebooted — engine restored")
+        }
+        notificationLogRepository.addSystemLog("[Engine Diagnostic] Reminders re-armed after $reason")
     }
 }

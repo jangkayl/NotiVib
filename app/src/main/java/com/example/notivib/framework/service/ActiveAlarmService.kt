@@ -77,6 +77,41 @@ class ActiveAlarmService : Service() {
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
+                } else {
+                    val mode = intent?.getIntExtra(EXTRA_ALARM_MODE, MODE_INTERCEPT) ?: MODE_INTERCEPT
+                    if (mode == MODE_SCHEDULE_START || mode == MODE_SCHEDULE_END ||
+                        mode == MODE_SCHEDULE_START_FOLLOWUP || mode == MODE_SCHEDULE_END_FOLLOWUP
+                    ) {
+                        // Another alarm (intercept or schedule) is already ringing. Silently
+                        // dropping a schedule reminder here would break the reminder chain, so
+                        // retry it in 1 minute instead of ringing a second, overlapping alarm.
+                        //
+                        // The system already promoted us to foreground via startForegroundService
+                        // for this onStartCommand call, but that promotion applies to the Service
+                        // instance as a whole, not per-call — since startForeground() was already
+                        // called for the alarm that's currently ringing, we don't need (and must
+                        // not want) to call it again here, which would risk clobbering that
+                        // alarm's notification.
+                        val ruleId = intent?.getStringExtra("RULE_ID")
+                        val ruleName = intent?.getStringExtra("RULE_NAME") ?: ""
+                        val appName = intent?.getStringExtra("APP_NAME") ?: "An App"
+                        val isStart = mode == MODE_SCHEDULE_START || mode == MODE_SCHEDULE_START_FOLLOWUP
+                        val label = if (isStart) "START" else "END"
+                        com.example.notivib.framework.utils.ReminderDiagnostics.log(
+                            this,
+                            "[Reminder] DROPPED $label \"$ruleName\": another alarm was ringing — retrying in 1 min"
+                        )
+                        if (!ruleId.isNullOrEmpty()) {
+                            com.example.notivib.domain.manager.ScheduleReminderManager.scheduleFollowUp(
+                                context = this,
+                                appName = appName,
+                                ruleId = ruleId,
+                                isStart = isStart,
+                                ruleName = ruleName
+                            )
+                        }
+                    }
+                    // MODE_INTERCEPT: unchanged — silently drop, same as before.
                 }
             }
             ACTION_STOP -> {
@@ -228,6 +263,12 @@ class ActiveAlarmService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isAlarmRunning = false
+        stopAlarm()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
