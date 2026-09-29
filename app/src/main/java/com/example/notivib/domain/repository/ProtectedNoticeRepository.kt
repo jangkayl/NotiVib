@@ -113,7 +113,8 @@ internal fun parseNotices(json: String): List<ProtectedNotice> {
             )
         }
     } catch (e: Exception) {
-        // malformed or empty
+        // Malformed storage: return what parsed so far, and say so instead of failing silently.
+        android.util.Log.w("ProtectedNotice", "Failed to parse stored notices: ${e.message}")
     }
     return list
 }

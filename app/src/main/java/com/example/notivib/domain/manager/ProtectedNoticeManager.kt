@@ -9,7 +9,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.notivib.MainActivity
-import com.example.notivib.R
 import com.example.notivib.domain.repository.ProtectedNotice
 import com.example.notivib.domain.repository.ProtectedNoticeRepository
 import com.example.notivib.framework.receiver.ProtectedNoticeReceiver
@@ -47,7 +46,6 @@ object ProtectedNoticeManager {
                 ).apply {
                     setSound(null, null)
                     enableVibration(false)
-                    vibrationPattern = longArrayOf(0)
                 }
                 manager.createNotificationChannel(channel)
             }
@@ -91,7 +89,7 @@ object ProtectedNoticeManager {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.notivib_new_logo)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Fallback icon; a coloured PNG renders as a white block
             .setContentTitle("${notice.appName}: ${notice.title}")
             .setContentText(notice.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(notice.text))
@@ -108,9 +106,8 @@ object ProtectedNoticeManager {
 
         try {
             NotificationManagerCompat.from(context).notify(notice.notifId, notification)
-        } catch (e: SecurityException) {
-            ReminderDiagnostics.log(context, "[Protect] FAILED: ${e.message}")
         } catch (e: Exception) {
+            // Includes SecurityException when POST_NOTIFICATIONS is denied.
             ReminderDiagnostics.log(context, "[Protect] FAILED: ${e.message}")
         }
     }
@@ -132,7 +129,9 @@ object ProtectedNoticeManager {
             notices.forEach { notice ->
                 post(context, notice)
             }
-            ReminderDiagnostics.log(context, "[Protect] Restored ${notices.size} after reboot")
+            if (notices.isNotEmpty()) {
+                ReminderDiagnostics.log(context, "[Protect] Restored ${notices.size} after reboot")
+            }
         } catch (e: Exception) {
             ReminderDiagnostics.log(context, "[Protect] FAILED: ${e.message}")
         }
