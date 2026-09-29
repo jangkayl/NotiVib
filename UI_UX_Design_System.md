@@ -89,7 +89,7 @@ Shown when required permissions are missing. Blocks access to the main app until
   6. **Active Days** — Row of 7 circular toggles (M, T, W, Th, F, S, Su). Active: `#D9FF0B` with black text. Inactive: `#5B5B5B` with white text. Minimum 1 day must remain selected.
   7. **Custom Schedule Per Day** — Checkbox to enable per-day time windows. When disabled: single global Start/End time picker. When enabled: per-day rows with individual start/end time buttons.
   8. **Ring Alarm** — Switch toggle. Enables audio/vibration alarm when rule matches.
-  9. **Protect Notification** — Switch toggle ("Protect notification (stays until you acknowledge)"). Adds the message as a row in a single un-swipeable grouped summary notification ("Protected Notifications (N)") that remains until each row is acknowledged (or "Acknowledge all" is tapped).
+  9. **Protect Notification** — Switch toggle ("Protect notification (stays until you acknowledge)"). Adds the message as a row in a single un-swipeable grouped summary notification ("Protected Notifications (N)") that remains until "Acknowledge all" is tapped.
   10. **Remind When Schedule Starts/Ends** — Checkbox option.
   11. **Mute Notifications Outside Schedule** — Checkbox option. Silently deletes notifications from the target app outside the active window.
   12. **Vibration Only Mode** — Switch toggle. Disables audio alarm.

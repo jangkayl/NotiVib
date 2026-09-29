@@ -55,18 +55,7 @@
             style="@style/TextAppearance.Compat.Notification"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-        <ImageView
-            android:id="@+id/row1_ack"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="8dp"
-            android:padding="2dp"
-            android:src="@android:drawable/checkbox_on_background"
-            android:contentDescription="@null" />
+            android:layout_weight="1" />
     </LinearLayout>
 
 </LinearLayout>

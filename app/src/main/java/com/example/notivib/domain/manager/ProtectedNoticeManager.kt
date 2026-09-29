@@ -30,10 +30,6 @@ object ProtectedNoticeManager {
     // ActiveAlarmService (1001) and EngineForegroundService (2).
     private const val SUMMARY_ID = 3
 
-    // XOR mask applied to a notice's notifId when building its "acknowledge" PendingIntent so it
-    // can never collide with the request code used for the row's own click PendingIntent.
-    private const val ACK_REQUEST_CODE_MASK = -0x5f3759df
-
     private const val ACK_ALL_REQUEST_CODE = -1
     private const val REPOST_REQUEST_CODE = -2
 
@@ -96,19 +92,19 @@ object ProtectedNoticeManager {
             collapsedView.setTextViewText(R.id.header_text, headerText)
             expandedView.setTextViewText(R.id.header_text, headerText)
 
-            bindRow(context, collapsedView, notices[0], rowContainerId = R.id.row1, iconId = R.id.row1_icon, textId = R.id.row1_text, ackId = R.id.row1_ack)
+            bindRow(context, collapsedView, notices[0], rowContainerId = R.id.row1, iconId = R.id.row1_icon, textId = R.id.row1_text)
 
             val rowIds = listOf(
-                RowIds(R.id.row1, R.id.row1_icon, R.id.row1_text, R.id.row1_ack),
-                RowIds(R.id.row2, R.id.row2_icon, R.id.row2_text, R.id.row2_ack),
-                RowIds(R.id.row3, R.id.row3_icon, R.id.row3_text, R.id.row3_ack),
-                RowIds(R.id.row4, R.id.row4_icon, R.id.row4_text, R.id.row4_ack),
-                RowIds(R.id.row5, R.id.row5_icon, R.id.row5_text, R.id.row5_ack)
+                RowIds(R.id.row1, R.id.row1_icon, R.id.row1_text),
+                RowIds(R.id.row2, R.id.row2_icon, R.id.row2_text),
+                RowIds(R.id.row3, R.id.row3_icon, R.id.row3_text),
+                RowIds(R.id.row4, R.id.row4_icon, R.id.row4_text),
+                RowIds(R.id.row5, R.id.row5_icon, R.id.row5_text)
             )
             rowIds.forEachIndexed { index, ids ->
                 if (index < notices.size && index < MAX_ROWS) {
                     expandedView.setViewVisibility(ids.container, android.view.View.VISIBLE)
-                    bindRow(context, expandedView, notices[index], ids.container, ids.icon, ids.text, ids.ack)
+                    bindRow(context, expandedView, notices[index], ids.container, ids.icon, ids.text)
                 } else {
                     expandedView.setViewVisibility(ids.container, android.view.View.GONE)
                 }
@@ -164,7 +160,7 @@ object ProtectedNoticeManager {
         }
     }
 
-    private data class RowIds(val container: Int, val icon: Int, val text: Int, val ack: Int)
+    private data class RowIds(val container: Int, val icon: Int, val text: Int)
 
     private fun bindRow(
         context: Context,
@@ -172,8 +168,7 @@ object ProtectedNoticeManager {
         notice: ProtectedNotice,
         rowContainerId: Int,
         iconId: Int,
-        textId: Int,
-        ackId: Int
+        textId: Int
     ) {
         views.setTextViewText(textId, "${notice.title}: ${notice.text}")
 
@@ -202,29 +197,6 @@ object ProtectedNoticeManager {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         views.setOnClickPendingIntent(rowContainerId, contentPendingIntent)
-
-        val ackIntent = Intent(context, ProtectedNoticeReceiver::class.java).apply {
-            action = ProtectedNoticeReceiver.ACTION_ACK
-            putExtra(ProtectedNoticeReceiver.EXTRA_KEY, notice.key)
-        }
-        val ackPendingIntent = PendingIntent.getBroadcast(
-            context,
-            notice.notifId xor ACK_REQUEST_CODE_MASK,
-            ackIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        views.setOnClickPendingIntent(ackId, ackPendingIntent)
-    }
-
-    suspend fun acknowledge(context: Context, key: String) {
-        try {
-            val repository = getRepository(context)
-            val updated = repository.remove(key)
-            refresh(context, updated)
-            ReminderDiagnostics.log(context, "[Protect] Acknowledged: $key")
-        } catch (e: Exception) {
-            ReminderDiagnostics.log(context, "[Protect] FAILED: ${e.message}")
-        }
     }
 
     suspend fun acknowledgeAll(context: Context) {

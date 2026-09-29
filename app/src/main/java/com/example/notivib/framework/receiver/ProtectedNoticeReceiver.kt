@@ -25,10 +25,6 @@ class ProtectedNoticeReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 when (action) {
-                    ACTION_ACK -> {
-                        val key = intent.getStringExtra(EXTRA_KEY) ?: return@launch
-                        ProtectedNoticeManager.acknowledge(context, key)
-                    }
                     ACTION_ACK_ALL -> {
                         ProtectedNoticeManager.acknowledgeAll(context)
                     }
@@ -49,9 +45,7 @@ class ProtectedNoticeReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_ACK = "com.example.notivib.action.PROTECTED_NOTICE_ACK"
         const val ACTION_ACK_ALL = "com.example.notivib.action.PROTECTED_NOTICE_ACK_ALL"
         const val ACTION_REPOST = "com.example.notivib.action.PROTECTED_NOTICE_REPOST"
-        const val EXTRA_KEY = "extra_notice_key"
     }
 }
