@@ -32,6 +32,8 @@ object RuleSerialization {
             obj.put("muteOutsideSchedule", rule.muteOutsideSchedule)
             obj.put("remindSchedule", rule.remindSchedule)
             obj.put("ignoredKeywords", rule.ignoredKeywords)
+            obj.put("ringAlarm", rule.ringAlarm)
+            obj.put("protectNotification", rule.protectNotification)
             obj.put("activeDays", JSONArray(rule.activeDays))
             obj.put("hasCustomTimeWindows", rule.hasCustomTimeWindows)
             val customWindowsObj = JSONObject()
@@ -73,6 +75,8 @@ object RuleSerialization {
                     muteOutsideSchedule = obj.optBoolean("muteOutsideSchedule", false),
                     remindSchedule = obj.optBoolean("remindSchedule", false),
                     ignoredKeywords = obj.optString("ignoredKeywords", ""),
+                    ringAlarm = obj.optBoolean("ringAlarm", true),
+                    protectNotification = obj.optBoolean("protectNotification", false),
                     hasCustomTimeWindows = obj.optBoolean("hasCustomTimeWindows", false),
                     customTimeWindows = obj.optJSONObject("customTimeWindows")?.let { customWindowsObj ->
                         val map = mutableMapOf<Int, com.example.notivib.domain.model.TimeWindow>()

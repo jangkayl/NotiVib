@@ -378,6 +378,8 @@ fun RulesListScreen(
                                             muteOutsideSchedule = obj.optBoolean("muteOutsideSchedule", false),
                                             remindSchedule = obj.optBoolean("remindSchedule", false),
                                             ignoredKeywords = obj.optString("ignoredKeywords", ""),
+                                            ringAlarm = obj.optBoolean("ringAlarm", true),
+                                            protectNotification = obj.optBoolean("protectNotification", false),
                                             hasCustomTimeWindows = obj.optBoolean("hasCustomTimeWindows", false),
                                             customTimeWindows = obj.optJSONObject("customTimeWindows")?.let { customWindowsObj ->
                                                 val map = mutableMapOf<Int, com.example.notivib.domain.model.TimeWindow>()
@@ -952,6 +954,8 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
                                     put("muteOutsideSchedule", rule.muteOutsideSchedule)
                                     put("remindSchedule", rule.remindSchedule)
                                     put("ignoredKeywords", rule.ignoredKeywords)
+                                    put("ringAlarm", rule.ringAlarm)
+                                    put("protectNotification", rule.protectNotification)
                                     put("activeDays", org.json.JSONArray(rule.activeDays))
                                     put("hasCustomTimeWindows", rule.hasCustomTimeWindows)
                                     val customWindowsObj = org.json.JSONObject()

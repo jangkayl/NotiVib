@@ -18,7 +18,9 @@ data class AlarmRule(
     val customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
     val muteOutsideSchedule: Boolean = false,
     val remindSchedule: Boolean = false,
-    val ignoredKeywords: String = ""
+    val ignoredKeywords: String = "",
+    val ringAlarm: Boolean = true,
+    val protectNotification: Boolean = false
 )
 
 fun parseKeywords(raw: String): List<String> {
