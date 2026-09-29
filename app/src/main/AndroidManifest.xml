@@ -81,6 +81,9 @@
         <receiver android:name=".framework.receiver.ScheduleReminderReceiver"
             android:exported="false" />
 
+        <receiver android:name=".framework.receiver.ProtectedNoticeReceiver"
+            android:exported="false" />
+
         <receiver android:name=".framework.receiver.BootReceiver"
             android:exported="false">
             <intent-filter>

@@ -50,6 +50,35 @@ class NotificationInterceptionTest {
     }
 
     @Test
+    fun testTriggerAlarm_withProtectNotificationOnly_returnsTriggerAlarm() = runBlocking {
+        val rule = AlarmRule(
+            id = "protect-only-1",
+            ruleName = "Protect Only Alert",
+            targetPackage = "com.slack",
+            keyword = "mention",
+            activeDays = setOf(currentDay),
+            startTimeMinute = 0,
+            endTimeMinute = 1439,
+            ringAlarm = false,
+            protectNotification = true
+        )
+        val repo = FakeRuleRepository(listOf(rule))
+        val useCase = EvaluateNotificationUseCase(repo)
+
+        val result = useCase.evaluate(
+            packageName = "com.slack",
+            appName = "Slack",
+            title = "New mention",
+            text = "Someone mentioned you"
+        )
+
+        assertTrue(result is EvaluationResult.TriggerAlarm)
+        val triggerResult = result as EvaluationResult.TriggerAlarm
+        assertEquals(rule, triggerResult.rule)
+        assertEquals(listOf("mention"), triggerResult.matchedKeywords)
+    }
+
+    @Test
     fun testIgnoredKeyword_preventsAlarmTrigger() = runBlocking {
         val rule = AlarmRule(
             id = "2",
