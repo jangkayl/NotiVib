@@ -65,6 +65,8 @@ fun EditRuleScreen(
     var vibrationOnly by remember { mutableStateOf(rule?.vibrationOnly ?: false) }
     var muteOutsideSchedule by remember { mutableStateOf(rule?.muteOutsideSchedule ?: false) }
     var remindSchedule by remember { mutableStateOf(rule?.remindSchedule ?: false) }
+    var ringAlarm by remember { mutableStateOf(rule?.ringAlarm ?: true) }
+    var protectNotification by remember { mutableStateOf(rule?.protectNotification ?: false) }
     val ignoredKeywordChips = remember {
         mutableStateListOf<String>().apply {
             val triggerParsed = com.example.notivib.domain.model.parseKeywords(rule?.keyword ?: "").map { it.lowercase() }
@@ -129,7 +131,7 @@ fun EditRuleScreen(
 
     val hasUnsavedChanges = remember(
         ruleName, currentKeywordString, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule, 
-        remindSchedule, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, currentIgnoredString,
+        remindSchedule, ringAlarm, protectNotification, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, currentIgnoredString,
         triggerInputText, ignoredInputText
     ) {
         triggerInputText.trim().isNotEmpty() ||
@@ -141,6 +143,8 @@ fun EditRuleScreen(
         vibrationOnly != (rule?.vibrationOnly ?: false) ||
         muteOutsideSchedule != (rule?.muteOutsideSchedule ?: false) ||
         remindSchedule != (rule?.remindSchedule ?: false) ||
+        ringAlarm != (rule?.ringAlarm ?: true) ||
+        protectNotification != (rule?.protectNotification ?: false) ||
         ignoredKeywordChips.toList() != initialIgnoredParsed ||
         hasCustomTimeWindows != (rule?.hasCustomTimeWindows ?: false) ||
         customTimeWindows != (rule?.customTimeWindows ?: emptyMap<Int, com.example.notivib.domain.model.TimeWindow>()) ||
@@ -180,7 +184,9 @@ fun EditRuleScreen(
             customTimeWindows = customTimeWindows,
             muteOutsideSchedule = muteOutsideSchedule,
             remindSchedule = remindSchedule,
-            ignoredKeywords = ignoredKeywordChips.joinToString("|||")
+            ignoredKeywords = ignoredKeywordChips.joinToString("|||"),
+            ringAlarm = ringAlarm,
+            protectNotification = protectNotification
         )
         onNavigateBack()
     }
@@ -331,6 +337,11 @@ fun EditRuleScreen(
                             return@Button
                         }
 
+                        if (!ringAlarm && !protectNotification && !muteOutsideSchedule) {
+                            android.widget.Toast.makeText(context, "Rule must either ring alarm, protect notification, or mute outside schedule", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
                         val existingRules = viewModel.rules.value
                         val isDuplicateName = existingRules.any { it.ruleName.equals(ruleName, ignoreCase = true) && it.ruleName.isNotEmpty() && it.id != rule?.id }
                         
@@ -350,6 +361,8 @@ fun EditRuleScreen(
                             it.vibrationOnly == vibrationOnly &&
                             it.muteOutsideSchedule == muteOutsideSchedule &&
                             it.remindSchedule == remindSchedule &&
+                            it.ringAlarm == ringAlarm &&
+                            it.protectNotification == protectNotification &&
                             it.hasCustomTimeWindows == hasCustomTimeWindows &&
                             it.customTimeWindows == customTimeWindows
                         }
@@ -711,6 +724,32 @@ fun EditRuleScreen(
 
             Spacer(Modifier.height(16.dp))
             
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { ringAlarm = !ringAlarm }.padding(vertical = 8.dp)) {
+                Switch(
+                    checked = ringAlarm, 
+                    onCheckedChange = { ringAlarm = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = accentColor, uncheckedThumbColor = Color.Gray, uncheckedTrackColor = darkSurface)
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text("Ring alarm", fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                    Text("Triggers an alarm when a matching notification arrives.", fontFamily = HostGrotesk, color = textColor, fontSize = 12.sp)
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { protectNotification = !protectNotification }.padding(vertical = 8.dp)) {
+                Switch(
+                    checked = protectNotification, 
+                    onCheckedChange = { protectNotification = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = accentColor, uncheckedThumbColor = Color.Gray, uncheckedTrackColor = darkSurface)
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text("Protect notification (stays until you acknowledge)", fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                    Text("Posts an un-swipeable copy that remains until acknowledged.", fontFamily = HostGrotesk, color = textColor, fontSize = 12.sp)
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { remindSchedule = !remindSchedule }.padding(vertical = 8.dp)) {
                 Checkbox(
                     checked = remindSchedule, 

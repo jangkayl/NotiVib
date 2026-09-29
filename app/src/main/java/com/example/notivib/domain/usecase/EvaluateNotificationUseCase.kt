@@ -81,6 +81,8 @@ class EvaluateNotificationUseCase @Inject constructor(
                         title.contains(ik, ignoreCase = true) || text.contains(ik, ignoreCase = true)
                     }
                     if (!isIgnored) {
+                        // Known limitation: evaluation stops at the first matching rule.
+                        // Callers inspect rule.ringAlarm and rule.protectNotification to decide what actions to trigger.
                         return EvaluationResult.TriggerAlarm(rule, matchedKwList)
                     }
                 }

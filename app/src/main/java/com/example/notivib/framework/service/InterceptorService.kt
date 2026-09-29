@@ -6,9 +6,13 @@ import android.content.Intent
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
+import com.example.notivib.domain.manager.ProtectedNoticeManager
 import com.example.notivib.domain.repository.NotificationLogRepository
+import com.example.notivib.domain.repository.ProtectedNotice
+import com.example.notivib.domain.repository.ProtectedNoticeRepository
 import com.example.notivib.domain.usecase.EvaluateNotificationUseCase
 import com.example.notivib.framework.utils.NotificationTextExtractor
+import com.example.notivib.framework.utils.ReminderDiagnostics
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +34,9 @@ class InterceptorService : NotificationListenerService() {
 
     @Inject
     lateinit var notificationLogRepository: NotificationLogRepository
+
+    @Inject
+    lateinit var protectedNoticeRepository: ProtectedNoticeRepository
 
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
         notificationLogRepository.addSystemLog("[Engine Error] Unhandled: ${throwable.message}")
@@ -161,7 +168,31 @@ class InterceptorService : NotificationListenerService() {
 
                     when (evaluationResult) {
                         is com.example.notivib.domain.usecase.EvaluationResult.TriggerAlarm -> {
-                            if (!ActiveAlarmService.isAlarmRunning) {
+                            if (evaluationResult.rule.protectNotification) {
+                                val key = "$packageName|${conversationTitle.ifEmpty { title }}"
+                                val existing = protectedNoticeRepository.getAll().find { it.key == key }
+                                val action = if (existing != null) "Updated" else "Posted"
+                                val notice = ProtectedNotice(
+                                    key = key,
+                                    notifId = key.hashCode(),
+                                    packageName = packageName,
+                                    appName = appName.ifEmpty { packageName },
+                                    title = title.ifEmpty { "No Title" },
+                                    text = fullText.ifEmpty { "No Content" },
+                                    timeMillis = System.currentTimeMillis(),
+                                    ruleName = evaluationResult.rule.ruleName
+                                )
+                                protectedNoticeRepository.upsert(notice)
+                                ProtectedNoticeManager.post(this@InterceptorService, notice)
+                                val displayApp = appName.ifEmpty { packageName }
+                                val displayTitle = title.ifEmpty { "No Title" }
+                                ReminderDiagnostics.log(
+                                    this@InterceptorService,
+                                    "[Protect] $action \"$displayApp: $displayTitle\" (${evaluationResult.rule.ruleName})"
+                                )
+                            }
+
+                            if (evaluationResult.rule.ringAlarm && !ActiveAlarmService.isAlarmRunning) {
                                 val matchedKwDisplay = if (evaluationResult.matchedKeywords.isNotEmpty()) {
                                     evaluationResult.matchedKeywords.joinToString(", ")
                                 } else {

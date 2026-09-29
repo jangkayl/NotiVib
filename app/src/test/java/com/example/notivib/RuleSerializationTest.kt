@@ -5,6 +5,7 @@ import com.example.notivib.domain.model.RuleSerialization
 import com.example.notivib.domain.model.TimeWindow
 import org.json.JSONException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -62,6 +63,55 @@ class RuleSerializationTest {
         val parsed = RuleSerialization.parseRules(json)
 
         assertEquals(rules, parsed)
+    }
+
+    @Test
+    fun roundTrip_withProtectNotificationAndRingAlarm() {
+        val rules = listOf(
+            AlarmRule(
+                id = "rule-protect-1",
+                ruleName = "Protect Only",
+                targetPackage = "com.whatsapp",
+                keyword = "important",
+                startTimeMinute = 0,
+                endTimeMinute = 1439,
+                ringAlarm = false,
+                protectNotification = true
+            ),
+            AlarmRule(
+                id = "rule-ring-and-protect",
+                ruleName = "Ring and Protect",
+                targetPackage = "com.slack",
+                keyword = "urgent",
+                startTimeMinute = 480,
+                endTimeMinute = 1020,
+                ringAlarm = true,
+                protectNotification = true
+            )
+        )
+        val json = RuleSerialization.serializeRules(rules)
+        val parsed = RuleSerialization.parseRules(json)
+        assertEquals(rules, parsed)
+    }
+
+    @Test
+    fun legacyJsonWithoutRingAlarmOrProtectNotification_parsesToDefaults() {
+        val legacyJson = """
+            [
+              {
+                "id": "legacy-rule",
+                "ruleName": "Old Rule",
+                "targetPackage": "com.telegram",
+                "keyword": "alert",
+                "startTimeMinute": 60,
+                "endTimeMinute": 120
+              }
+            ]
+        """.trimIndent()
+        val parsed = RuleSerialization.parseRules(legacyJson)
+        assertEquals(1, parsed.size)
+        assertTrue(parsed[0].ringAlarm)
+        assertFalse(parsed[0].protectNotification)
     }
 
     @Test
