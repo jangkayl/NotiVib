@@ -50,12 +50,17 @@ class ScheduleReceiver : BroadcastReceiver() {
                     e.printStackTrace()
                 }
 
-                ScheduleReminderManager.rescheduleAll(context, rules)
+                ScheduleReminderManager.rescheduleAll(context, rules, forceLog = intent.getBooleanExtra(EXTRA_VERBOSE, false))
             } catch (t: Throwable) {
                 ReminderDiagnostics.log(context, "[Reminder] FAILED to re-arm reminders: ${t.message}")
             } finally {
                 pendingResult.finish()
             }
         }
+    }
+
+    companion object {
+        /** Set by user-initiated re-arms (Restart Engine) so every reminder's re-arm is logged. */
+        const val EXTRA_VERBOSE = "extra_verbose"
     }
 }

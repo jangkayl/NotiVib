@@ -19,7 +19,7 @@ object ScheduleReminderManager {
 
     private val LOG_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
-    fun scheduleForRule(context: Context, rule: AlarmRule, isRescheduling: Boolean = false) {
+    fun scheduleForRule(context: Context, rule: AlarmRule, isRescheduling: Boolean = false, forceLog: Boolean = false) {
         if (!rule.remindSchedule || !rule.isActive || rule.activeDays.isEmpty()) {
             cancelAlarm(context, rule.id)
             return
@@ -63,14 +63,14 @@ object ScheduleReminderManager {
         }
 
         if (nextStart != null) {
-            arm(context, rule, isStart = true, triggerAt = nextStart)
+            arm(context, rule, isStart = true, triggerAt = nextStart, forceLog = forceLog)
         }
         if (nextEnd != null) {
-            arm(context, rule, isStart = false, triggerAt = nextEnd)
+            arm(context, rule, isStart = false, triggerAt = nextEnd, forceLog = forceLog)
         }
     }
 
-    private fun arm(context: Context, rule: AlarmRule, isStart: Boolean, triggerAt: LocalDateTime) {
+    private fun arm(context: Context, rule: AlarmRule, isStart: Boolean, triggerAt: LocalDateTime, forceLog: Boolean) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val label = if (isStart) "START" else "END"
         val intent = Intent(context, ScheduleReminderReceiver::class.java).apply {
@@ -99,10 +99,11 @@ object ScheduleReminderManager {
 
             // Only log "Armed" when the target trigger time actually changed, so the frequent
             // rescheduleAll sweeps (every schedule evaluation + every fired reminder) don't
-            // flood the diagnostics log with an identical line every time.
+            // flood the diagnostics log with an identical line every time. [forceLog] overrides
+            // that for user-initiated sweeps (Restart Engine) so they visibly confirm the re-arm.
             val previous = ReminderStateStore.getExpected(context, rule.id, isStart)
             ReminderStateStore.setExpected(context, rule.id, isStart, triggerAtMillis, rule.ruleName)
-            if (previous == null || previous.millis != triggerAtMillis) {
+            if (forceLog || previous == null || previous.millis != triggerAtMillis) {
                 ReminderDiagnostics.log(
                     context,
                     "[Reminder] Armed $label \"${rule.ruleName}\" for ${triggerAt.format(LOG_TIME_FORMAT)}"
@@ -183,7 +184,7 @@ object ScheduleReminderManager {
      * already passed (with a grace period) without having been cleared by a fire — meaning the
      * alarm silently failed to deliver — and logs them as MISSED before re-arming.
      */
-    fun rescheduleAll(context: Context, rules: List<AlarmRule>, logMissed: Boolean = true) {
+    fun rescheduleAll(context: Context, rules: List<AlarmRule>, logMissed: Boolean = true, forceLog: Boolean = false) {
         if (logMissed) {
             val graceMillis = 2 * 60_000L
             val expired = ReminderStateStore.allExpired(context, System.currentTimeMillis(), graceMillis)
@@ -203,7 +204,12 @@ object ScheduleReminderManager {
         }
 
         for (rule in rules) {
-            scheduleForRule(context, rule, isRescheduling = true)
+            scheduleForRule(context, rule, isRescheduling = true, forceLog = forceLog)
+        }
+
+        if (forceLog) {
+            val count = rules.count { it.remindSchedule && it.isActive && it.activeDays.isNotEmpty() }
+            ReminderDiagnostics.log(context, "[Reminder] Re-arm sweep complete: $count rule(s) with reminders")
         }
     }
 
