@@ -20,23 +20,19 @@ class ProtectedNoticeReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        val key = intent.getStringExtra(EXTRA_KEY) ?: return
 
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 when (action) {
-                    ACTION_ACK -> {
-                        ProtectedNoticeManager.acknowledge(context, key)
+                    ACTION_ACK_ALL -> {
+                        ProtectedNoticeManager.acknowledgeAll(context)
                     }
                     ACTION_REPOST -> {
-                        val notice = repository.getAll().find { it.key == key }
-                        if (notice != null) {
-                            ProtectedNoticeManager.post(context, notice)
-                            ReminderDiagnostics.log(
-                                context,
-                                "[Protect] Re-posted after swipe: ${notice.appName}: ${notice.title} (${notice.ruleName})"
-                            )
+                        val notices = repository.getAll()
+                        ProtectedNoticeManager.refresh(context, notices)
+                        if (notices.isNotEmpty()) {
+                            ReminderDiagnostics.log(context, "[Protect] Re-posted after swipe")
                         }
                     }
                 }
@@ -49,8 +45,7 @@ class ProtectedNoticeReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_ACK = "com.example.notivib.action.PROTECTED_NOTICE_ACK"
+        const val ACTION_ACK_ALL = "com.example.notivib.action.PROTECTED_NOTICE_ACK_ALL"
         const val ACTION_REPOST = "com.example.notivib.action.PROTECTED_NOTICE_REPOST"
-        const val EXTRA_KEY = "extra_notice_key"
     }
 }

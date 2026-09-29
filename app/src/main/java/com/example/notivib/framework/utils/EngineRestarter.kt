@@ -43,7 +43,9 @@ object EngineRestarter {
 
         try {
             // Re-arm the schedule + reminder alarms as part of the restart.
-            appContext.sendBroadcast(Intent(appContext, ScheduleReceiver::class.java))
+            appContext.sendBroadcast(
+                Intent(appContext, ScheduleReceiver::class.java).putExtra(ScheduleReceiver.EXTRA_VERBOSE, true)
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
