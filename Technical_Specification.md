@@ -43,7 +43,7 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 - **Managers**:
   - `ScheduleManager` — Evaluates all rules to determine if interception should be active. Schedules `AlarmManager` exact alarms for the next schedule state transition. Returns `true` if any rule is currently active OR any rule has `muteOutsideSchedule` enabled.
   - `ScheduleReminderManager` — Schedules start/end reminder notifications for rules with `remindSchedule` enabled. Uses per-rule request codes derived from rule ID hash. Falls back to inexact alarms when `canScheduleExactAlarms()` is false. Tracks each armed reminder's expected trigger time via `ReminderStateStore` and exposes `rescheduleAll(context, rules)`, which detects reminders that silently failed to fire (logged as `MISSED`) before re-arming every rule. All reminder lifecycle events (`Armed`/`Fired`/`FAILED`/`DROPPED`/`MISSED`) are written to the system log via `ReminderDiagnostics`, prefixed `[Reminder]`.
-  - `ProtectedNoticeManager` — Manages posting, acknowledging, and restoring persistent protected notifications. Posts un-swipeable ongoing notifications on `IMPORTANCE_DEFAULT` channel with no sound/vibration, with an "Acknowledge" action button and a repost delete intent to prevent swiping away.
+  - `ProtectedNoticeManager` — Manages a single grouped, un-swipeable ongoing summary notification (fixed id, `IMPORTANCE_DEFAULT` channel, no sound/vibration) listing all pending protected messages newest-first via `RemoteViews`/`DecoratedCustomViewStyle` — collapsed view shows the newest message, expanded view shows up to 5 rows (each with app icon, "title: text", and a per-row ✓ acknowledge button) plus a "+N more" line beyond 5. Tapping a row opens that app without dismissing it; "Acknowledge all" clears everything. `refresh(context, notices)` rebuilds/cancels the summary from the current list and also cancels any legacy per-conversation notification ids left over from the previous per-notice version.
 
 ### 3. Data & Framework Layer
 
@@ -60,7 +60,7 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 - **Receivers**:
   - `ScheduleReceiver` — Triggered by `AlarmManager` or manual broadcast. Re-evaluates all rules via `ScheduleManager`, updates `EngineState`, starts/stops `EngineForegroundService`, and calls `ScheduleReminderManager.rescheduleAll` to re-arm all reminder alarms. Uses `goAsync()` so the work can finish even if the process is about to be killed, and catches all `Throwable`s so it can never crash.
   - `ScheduleReminderReceiver` — Handles start/end schedule reminder notifications with follow-up rescheduling. Uses `goAsync()`; clears the fired reminder's expected-time marker and re-arms the next occurrence before finishing.
-  - `ProtectedNoticeReceiver` — Handles `ACTION_ACK` (acknowledges and dismisses protected notification, removing it from `ProtectedNoticeRepository`) and `ACTION_REPOST` (re-posts protected notice if still present in repository).
+  - `ProtectedNoticeReceiver` — Handles `ACTION_ACK` (removes one notice by key and refreshes the summary), `ACTION_ACK_ALL` (clears all pending notices and cancels the summary), and `ACTION_REPOST` (re-refreshes the summary from the repository, used as the summary's delete intent).
   - `BootReceiver` — Re-arms schedule + reminder alarms on `BOOT_COMPLETED`/`LOCKED_BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` (app update), `TIMEZONE_CHANGED`, and `TIME_SET`, by rebroadcasting to `ScheduleReceiver`. Also restores all active protected notifications via `ProtectedNoticeManager.restoreAll` on boot and app update, regardless of `EngineState.isGloballyEnabled`.
 
 - **Reminder re-arming triggers**: reminders are (re)armed whenever a rule is saved, whenever a reminder fires (chaining to the next occurrence), on every `ScheduleReceiver` sweep (boot, app update, timezone/time change, and the periodic schedule-transition alarm), and every time `MainActivity.onResume()` runs (idempotent — alarms use `FLAG_UPDATE_CURRENT` with fixed request codes). This removes the single points of failure that previously let the reminder chain die permanently.
@@ -78,8 +78,9 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 
 - **Protected Notifications Diagnostics**: All protected notification lifecycle events are written to the system log via `ReminderDiagnostics` with the `[Protect]` prefix:
   - `Posted` / `Updated` — Logged when an incoming notification matches a rule with `protectNotification` enabled.
-  - `Acknowledged` — Logged when user taps the Acknowledge button on the protected notification copy.
-  - `Re-posted after swipe` — Logged when the system delete intent triggers and re-posts the protected notification.
+  - `Acknowledged` — Logged when the user taps a row's ✓ button.
+  - `Acknowledged all` — Logged when the user taps the "Acknowledge all" action.
+  - `Re-posted after swipe` — Logged when the summary's delete intent triggers and the summary is refreshed.
   - `Restored N after reboot` — Logged when `BootReceiver` restores persisted protected notices on device boot or app update.
   - `Evicted oldest (cap reached)` — Logged when `ProtectedNoticeRepository` exceeds 40 entries and evicts the oldest notice.
   - `FAILED ...` — Logged when notification posting (`POST_NOTIFICATIONS` denied), receiver handling, or restore encounters an exception.

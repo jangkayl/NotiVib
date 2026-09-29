@@ -6,12 +6,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.notivib.framework.utils.ReminderDiagnostics
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
@@ -35,7 +32,6 @@ class ProtectedNoticeRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val NOTICES_KEY = stringPreferencesKey("protected_notices_json")
-    private val scope = CoroutineScope(Dispatchers.IO)
 
     val notices: Flow<List<ProtectedNotice>> = context.protectedNoticesDataStore.data.map { prefs ->
         parseNotices(prefs[NOTICES_KEY] ?: "[]")
@@ -46,34 +42,34 @@ class ProtectedNoticeRepository @Inject constructor(
         return parseNotices(prefs[NOTICES_KEY] ?: "[]")
     }
 
-    fun upsert(notice: ProtectedNotice) {
-        scope.launch {
-            context.protectedNoticesDataStore.edit { prefs ->
-                val current = parseNotices(prefs[NOTICES_KEY] ?: "[]")
-                val (updated, evicted) = upsertNoticeInList(current, notice)
-                if (evicted) {
-                    ReminderDiagnostics.log(context, "[Protect] Evicted oldest (cap reached)")
-                }
-                prefs[NOTICES_KEY] = serializeNotices(updated)
+    suspend fun upsert(notice: ProtectedNotice): List<ProtectedNotice> {
+        var result: List<ProtectedNotice> = emptyList()
+        context.protectedNoticesDataStore.edit { prefs ->
+            val current = parseNotices(prefs[NOTICES_KEY] ?: "[]")
+            val (updated, evicted) = upsertNoticeInList(current, notice)
+            if (evicted) {
+                ReminderDiagnostics.log(context, "[Protect] Evicted oldest (cap reached)")
             }
+            prefs[NOTICES_KEY] = serializeNotices(updated)
+            result = updated
         }
+        return result
     }
 
-    fun remove(key: String) {
-        scope.launch {
-            context.protectedNoticesDataStore.edit { prefs ->
-                val current = parseNotices(prefs[NOTICES_KEY] ?: "[]")
-                val updated = removeNoticeFromList(current, key)
-                prefs[NOTICES_KEY] = serializeNotices(updated)
-            }
+    suspend fun remove(key: String): List<ProtectedNotice> {
+        var result: List<ProtectedNotice> = emptyList()
+        context.protectedNoticesDataStore.edit { prefs ->
+            val current = parseNotices(prefs[NOTICES_KEY] ?: "[]")
+            val updated = removeNoticeFromList(current, key)
+            prefs[NOTICES_KEY] = serializeNotices(updated)
+            result = updated
         }
+        return result
     }
 
-    fun clear() {
-        scope.launch {
-            context.protectedNoticesDataStore.edit { prefs ->
-                prefs[NOTICES_KEY] = "[]"
-            }
+    suspend fun clear() {
+        context.protectedNoticesDataStore.edit { prefs ->
+            prefs[NOTICES_KEY] = "[]"
         }
     }
 }

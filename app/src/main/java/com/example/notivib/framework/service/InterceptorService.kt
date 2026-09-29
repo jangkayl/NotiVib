@@ -182,8 +182,8 @@ class InterceptorService : NotificationListenerService() {
                                     timeMillis = System.currentTimeMillis(),
                                     ruleName = evaluationResult.rule.ruleName
                                 )
-                                protectedNoticeRepository.upsert(notice)
-                                ProtectedNoticeManager.post(this@InterceptorService, notice)
+                                val updated = protectedNoticeRepository.upsert(notice)
+                                ProtectedNoticeManager.refresh(this@InterceptorService, updated)
                                 val displayApp = appName.ifEmpty { packageName }
                                 val displayTitle = title.ifEmpty { "No Title" }
                                 ReminderDiagnostics.log(
