@@ -905,14 +905,32 @@ fun RuleCard(rule: AlarmRule, onDelete: (AlarmRule) -> Unit, onEdit: (AlarmRule)
                     Spacer(Modifier.width(14.dp))
 
                     Column {
-                        Text(
-                            text = displayTitle,
-                            fontFamily = SourceSerif4,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = textColor,
-                            maxLines = 1
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = displayTitle,
+                                fontFamily = SourceSerif4,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = textColor,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (rule.protectNotification) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (rule.isActive) Color(0xFF20201E) else Color(0xFF333333)
+                                ) {
+                                    Text(
+                                        text = "Protected",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFD9FF0B)
+                                    )
+                                }
+                            }
+                        }
                         Text(
                             text = if (rule.targetPackage == "ANY") "all.apps" else rule.targetPackage,
                             style = MaterialTheme.typography.labelSmall,

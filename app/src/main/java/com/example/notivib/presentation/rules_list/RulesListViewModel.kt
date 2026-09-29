@@ -68,7 +68,9 @@ class RulesListViewModel @Inject constructor(
         customTimeWindows: Map<Int, TimeWindow> = emptyMap(),
         muteOutsideSchedule: Boolean = false,
         remindSchedule: Boolean = false,
-        ignoredKeywords: String = ""
+        ignoredKeywords: String = "",
+        ringAlarm: Boolean = true,
+        protectNotification: Boolean = false
     ) {
         val ruleId = id ?: java.util.UUID.randomUUID().toString()
         val triggerList = com.example.notivib.domain.model.parseKeywords(keyword)
@@ -98,7 +100,9 @@ class RulesListViewModel @Inject constructor(
                     customTimeWindows = customTimeWindows,
                     muteOutsideSchedule = muteOutsideSchedule,
                     remindSchedule = remindSchedule,
-                    ignoredKeywords = deduplicatedIgnored
+                    ignoredKeywords = deduplicatedIgnored,
+                    ringAlarm = ringAlarm,
+                    protectNotification = protectNotification
                 )
             )
             triggerEvaluation()
