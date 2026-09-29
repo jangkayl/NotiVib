@@ -690,23 +690,16 @@ fun RulesListScreen(
                         Button(
                             onClick = {
                                 if (com.example.notivib.framework.utils.EngineState.isShowForegroundNotification(context)) {
-                                    // Foreground notification is enabled: let the service rebind, redraw the
-                                    // healthy banner, and log the restart diagnostic itself.
+                                    // Foreground notification is enabled: let the service redraw the
+                                    // healthy banner in addition to restarting the engine.
                                     val restartIntent = Intent(context, com.example.notivib.framework.service.EngineForegroundService::class.java).apply {
                                         action = com.example.notivib.framework.service.EngineForegroundService.ACTION_RESTART
                                     }
                                     context.startForegroundService(restartIntent)
                                 } else {
-                                    // User disabled the persistent notification: rebind + log directly without
+                                    // User disabled the persistent notification: restart directly without
                                     // forcing a foreground-service banner they opted out of.
-                                    try {
-                                        NotificationListenerService.requestRebind(
-                                            ComponentName(context, com.example.notivib.framework.service.InterceptorService::class.java)
-                                        )
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                    }
-                                    viewModel.logEngineRestart()
+                                    com.example.notivib.framework.utils.EngineRestarter.restart(context)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),

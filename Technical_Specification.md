@@ -42,7 +42,7 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 
 - **Managers**:
   - `ScheduleManager` — Evaluates all rules to determine if interception should be active. Schedules `AlarmManager` exact alarms for the next schedule state transition. Returns `true` if any rule is currently active OR any rule has `muteOutsideSchedule` enabled.
-  - `ScheduleReminderManager` — Schedules start/end reminder notifications for rules with `remindSchedule` enabled. Uses per-rule request codes derived from rule ID hash.
+  - `ScheduleReminderManager` — Schedules start/end reminder notifications for rules with `remindSchedule` enabled. Uses per-rule request codes derived from rule ID hash. Falls back to inexact alarms when `canScheduleExactAlarms()` is false. Tracks each armed reminder's expected trigger time via `ReminderStateStore` and exposes `rescheduleAll(context, rules)`, which detects reminders that silently failed to fire (logged as `MISSED`) before re-arming every rule. All reminder lifecycle events (`Armed`/`Fired`/`FAILED`/`DROPPED`/`MISSED`) are written to the system log via `ReminderDiagnostics`, prefixed `[Reminder]`.
 
 ### 3. Data & Framework Layer
 
@@ -56,8 +56,11 @@ Pure Kotlin modules containing core business logic. No Android framework depende
   - `EngineForegroundService` — Optional persistent notification showing "NotiVib Active" status. Uses `FOREGROUND_SERVICE_TYPE_SPECIAL_USE`.
 
 - **Receivers**:
-  - `ScheduleReceiver` — Triggered by `AlarmManager` or manual broadcast. Re-evaluates all rules via `ScheduleManager`, updates `EngineState`, and starts/stops `EngineForegroundService`.
-  - `ScheduleReminderReceiver` — Handles start/end schedule reminder notifications with follow-up rescheduling.
+  - `ScheduleReceiver` — Triggered by `AlarmManager` or manual broadcast. Re-evaluates all rules via `ScheduleManager`, updates `EngineState`, starts/stops `EngineForegroundService`, and calls `ScheduleReminderManager.rescheduleAll` to re-arm all reminder alarms. Uses `goAsync()` so the work can finish even if the process is about to be killed, and catches all `Throwable`s so it can never crash.
+  - `ScheduleReminderReceiver` — Handles start/end schedule reminder notifications with follow-up rescheduling. Uses `goAsync()`; clears the fired reminder's expected-time marker and re-arms the next occurrence before finishing.
+  - `BootReceiver` — Re-arms schedule + reminder alarms on `BOOT_COMPLETED`/`LOCKED_BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` (app update), `TIMEZONE_CHANGED`, and `TIME_SET`, by rebroadcasting to `ScheduleReceiver`. This runs regardless of `EngineState.isGloballyEnabled` so reminders keep working even when the engine itself is off.
+
+- **Reminder re-arming triggers**: reminders are (re)armed whenever a rule is saved, whenever a reminder fires (chaining to the next occurrence), on every `ScheduleReceiver` sweep (boot, app update, timezone/time change, and the periodic schedule-transition alarm), and every time `MainActivity.onResume()` runs (idempotent — alarms use `FLAG_UPDATE_CURRENT` with fixed request codes). This removes the single points of failure that previously let the reminder chain die permanently.
 
 - **Engine State** (`EngineState` singleton via SharedPreferences):
   - `isGloballyEnabled` — Master on/off switch
@@ -66,7 +69,9 @@ Pure Kotlin modules containing core business logic. No Android framework depende
   - `trackedApps` — Set of packages to log (for notification history)
   - `shouldIntercept()` — Returns `isGloballyEnabled && isScheduleActive`
 
-- **Dependency Injection**: Hilt (`@AndroidEntryPoint`, `@HiltViewModel`, `@Module`/`@InstallIn`)
+- **Dependency Injection**: Hilt (`@AndroidEntryPoint`, `@HiltViewModel`, `@Module`/`@InstallIn`). `ReminderDiagnostics` exposes a Hilt `@EntryPoint` so plain objects/services that aren't constructor-injected (`ScheduleReminderManager`, `ScheduleManager`, `ActiveAlarmService`) can still resolve `NotificationLogRepository` from an application `Context`.
+
+- **Engine Restart**: `EngineRestarter.restart(context)` is the single code path for "Restart Engine", used by both the Restart Engine button in `RulesListScreen` and `EngineForegroundService`'s notification action. It toggles the `InterceptorService` component (disable/enable) to force a rebind, calls `NotificationListenerService.requestRebind`, rebroadcasts to `ScheduleReceiver` to re-arm schedule/reminder alarms, and logs `[Engine Diagnostic] Engine restarted by user` followed ~3s later by the resulting listener-connected state.
 
 ## System Requirements & Permissions
 - `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE` — Read incoming notifications

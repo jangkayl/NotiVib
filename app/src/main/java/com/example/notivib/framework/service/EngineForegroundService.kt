@@ -4,23 +4,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.service.notification.NotificationListenerService
 import androidx.core.app.NotificationCompat
 import com.example.notivib.MainActivity
-import com.example.notivib.domain.repository.NotificationLogRepository
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class EngineForegroundService : Service() {
-
-    @Inject
-    lateinit var notificationLogRepository: NotificationLogRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -46,16 +39,8 @@ class EngineForegroundService : Service() {
     }
 
     private fun handleRestart() {
-        try {
-            NotificationListenerService.requestRebind(
-                ComponentName(this, InterceptorService::class.java)
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
+        com.example.notivib.framework.utils.EngineRestarter.restart(this)
         showNotification(buildHealthyNotification())
-        notificationLogRepository.addSystemLog("[Engine Diagnostic] Engine restarted by user")
     }
 
     private fun showNotification(notification: android.app.Notification) {

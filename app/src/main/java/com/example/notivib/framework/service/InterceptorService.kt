@@ -146,7 +146,7 @@ class InterceptorService : NotificationListenerService() {
                     }
 
                     // Targeted diagnostic: only for apps the user is actually tracking, and only
-                    // when nothing fired, so this can't flood the 15-entry system log with noise
+                    // when nothing fired, so this can't flood the 50-entry system log with noise
                     // from every unrelated notification.
                     if (evaluationResult is com.example.notivib.domain.usecase.EvaluationResult.Ignore &&
                         (trackedApps.contains("ALL_APPS") || trackedApps.contains(packageName))
