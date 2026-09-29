@@ -82,16 +82,17 @@ Shown when required permissions are missing. Blocks access to the main app until
 - **Top App Bar**: Back arrow, "Edit Rule" or "New Rule" title, red Delete icon (edit mode only).
 - **Form Fields** (scrollable):
   1. **Rule Name** — Text field with placeholder "e.g. Work Rule"
-  2. **Trigger Keywords** — Dynamic chip/tag input. Type text & tap `+` (or press keyboard Done) to add chip. Each chip features an `✕` remove button.
-  3. **Ignored Keywords** — Dynamic chip/tag input for exclusion keywords. Helper text: "Notifications containing these words will be skipped even if they match trigger keywords."
-  4. **Target Application** — Card-style selector showing app icon, name, and package. Tapping opens full-screen dialog with search bar and scrollable app list. "ALL APPLICATIONS" option at top.
-  5. **Active Days** — Row of 7 circular toggles (M, T, W, Th, F, S, Su). Active: `#D9FF0B` with black text. Inactive: `#5B5B5B` with white text. Minimum 1 day must remain selected.
-  6. **Custom Schedule Per Day** — Checkbox to enable per-day time windows. When disabled: single global Start/End time picker. When enabled: per-day rows with individual start/end time buttons.
-  7. **Ring Alarm** — Switch toggle. Enables audio/vibration alarm when rule matches.
-  8. **Protect Notification** — Switch toggle ("Protect notification (stays until you acknowledge)"). Posts an un-swipeable notification copy that remains until acknowledged.
-  9. **Remind When Schedule Starts/Ends** — Checkbox option.
-  10. **Mute Notifications Outside Schedule** — Checkbox option. Silently deletes notifications from the target app outside the active window.
-  11. **Vibration Only Mode** — Switch toggle. Disables audio alarm.
+  2. **Intercept All Notifications** — Switch toggle. Defaults ON for new rules, OFF when editing an existing rule that already has trigger keywords. When ON, matches every notification from the target app and hides both the Trigger Keywords and Ignored Keywords groups below (their typed chips are kept in memory, not cleared, so toggling back OFF restores them). This replaces the old "at least one trigger keyword" requirement — a rule can be saved with an empty keyword when this is enabled.
+  3. **Trigger Keywords** — Dynamic chip/tag input. Type text & tap `+` (or press keyboard Done) to add chip. Each chip features an `✕` remove button. Hidden while "Intercept All Notifications" is ON.
+  4. **Ignored Keywords** — Dynamic chip/tag input for exclusion keywords. Helper text: "Notifications containing these words will be skipped even if they match trigger keywords." Hidden while "Intercept All Notifications" is ON.
+  5. **Target Application** — Card-style selector showing app icon, name, and package. Tapping opens full-screen dialog with search bar and scrollable app list. "ALL APPLICATIONS" option at top.
+  6. **Active Days** — Row of 7 circular toggles (M, T, W, Th, F, S, Su). Active: `#D9FF0B` with black text. Inactive: `#5B5B5B` with white text. Minimum 1 day must remain selected.
+  7. **Custom Schedule Per Day** — Checkbox to enable per-day time windows. When disabled: single global Start/End time picker. When enabled: per-day rows with individual start/end time buttons.
+  8. **Ring Alarm** — Switch toggle. Enables audio/vibration alarm when rule matches.
+  9. **Protect Notification** — Switch toggle ("Protect notification (stays until you acknowledge)"). Posts an un-swipeable notification copy that remains until acknowledged.
+  10. **Remind When Schedule Starts/Ends** — Checkbox option.
+  11. **Mute Notifications Outside Schedule** — Checkbox option. Silently deletes notifications from the target app outside the active window.
+  12. **Vibration Only Mode** — Switch toggle. Disables audio alarm.
 - **Guardrail**: Saving is blocked with a validation message if Ring Alarm, Protect Notification, and Mute Notifications Outside Schedule are all disabled (the rule would do nothing).
 - **Bottom Bar**: "Cancel" text button + "Save Rule" filled button (`#D9FF0B`).
 - **Unsaved Changes Dialog**: Warns before navigating away with unsaved edits. "Keep Editing" (accent) / "Discard" (red) buttons.

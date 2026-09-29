@@ -59,6 +59,7 @@ fun EditRuleScreen(
             addAll(com.example.notivib.domain.model.parseKeywords(rule?.keyword ?: ""))
         }
     }
+    var interceptAll by remember { mutableStateOf(rule == null || rule.keyword.isBlank()) }
     var targetPackage by remember { mutableStateOf(rule?.targetPackage ?: "ANY") }
     var activeDays by remember { mutableStateOf(rule?.activeDays ?: setOf(1, 2, 3, 4, 5, 6, 7)) }
 
@@ -128,16 +129,20 @@ fun EditRuleScreen(
     val initialIgnoredParsed = remember(rule) { com.example.notivib.domain.model.parseKeywords(rule?.ignoredKeywords ?: "") }
     val currentKeywordString = keywordChips.joinToString("|||")
     val currentIgnoredString = ignoredKeywordChips.joinToString("|||")
+    val effectiveKeywordChips: List<String> = if (interceptAll) emptyList() else keywordChips
+    val effectiveIgnoredKeywordChips: List<String> = if (interceptAll) emptyList() else ignoredKeywordChips
+    val initialInterceptAll = rule == null || rule.keyword.isBlank()
 
     val hasUnsavedChanges = remember(
-        ruleName, currentKeywordString, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule, 
+        ruleName, currentKeywordString, targetPackage, activeDays, vibrationOnly, muteOutsideSchedule,
         remindSchedule, ringAlarm, protectNotification, hasCustomTimeWindows, customTimeWindows, startTimeMinute, endTimeMinute, currentIgnoredString,
-        triggerInputText, ignoredInputText
+        triggerInputText, ignoredInputText, interceptAll
     ) {
-        triggerInputText.trim().isNotEmpty() ||
-        ignoredInputText.trim().isNotEmpty() ||
+        (!interceptAll && triggerInputText.trim().isNotEmpty()) ||
+        (!interceptAll && ignoredInputText.trim().isNotEmpty()) ||
         ruleName != (rule?.ruleName ?: "") ||
-        keywordChips.toList() != initialKeywordParsed ||
+        interceptAll != initialInterceptAll ||
+        (!interceptAll && keywordChips.toList() != initialKeywordParsed) ||
         targetPackage != (rule?.targetPackage ?: "ANY") ||
         activeDays != (rule?.activeDays ?: setOf(1, 2, 3, 4, 5, 6, 7)) ||
         vibrationOnly != (rule?.vibrationOnly ?: false) ||
@@ -145,7 +150,7 @@ fun EditRuleScreen(
         remindSchedule != (rule?.remindSchedule ?: false) ||
         ringAlarm != (rule?.ringAlarm ?: true) ||
         protectNotification != (rule?.protectNotification ?: false) ||
-        ignoredKeywordChips.toList() != initialIgnoredParsed ||
+        (!interceptAll && ignoredKeywordChips.toList() != initialIgnoredParsed) ||
         hasCustomTimeWindows != (rule?.hasCustomTimeWindows ?: false) ||
         customTimeWindows != (rule?.customTimeWindows ?: emptyMap<Int, com.example.notivib.domain.model.TimeWindow>()) ||
         startTimeMinute != (rule?.startTimeMinute ?: 0) ||
@@ -174,7 +179,7 @@ fun EditRuleScreen(
             id = rule?.id,
             ruleName = ruleName,
             targetPackage = targetPackage,
-            keyword = keywordChips.joinToString("|||"),
+            keyword = effectiveKeywordChips.joinToString("|||"),
             startTimeMinute = startTimeMinute,
             endTimeMinute = endTimeMinute,
             vibrationOnly = vibrationOnly,
@@ -184,7 +189,7 @@ fun EditRuleScreen(
             customTimeWindows = customTimeWindows,
             muteOutsideSchedule = muteOutsideSchedule,
             remindSchedule = remindSchedule,
-            ignoredKeywords = ignoredKeywordChips.joinToString("|||"),
+            ignoredKeywords = effectiveIgnoredKeywordChips.joinToString("|||"),
             ringAlarm = ringAlarm,
             protectNotification = protectNotification
         )
@@ -318,21 +323,21 @@ fun EditRuleScreen(
                 }
                 Button(
                     onClick = {
-                        if (triggerInputText.trim().isNotEmpty()) {
+                        if (!interceptAll && triggerInputText.trim().isNotEmpty()) {
                             val ok = tryAddKeyword(triggerInputText, keywordChips, ignoredKeywordChips, "Trigger Keywords", "Ignored Keywords", context) {
                                 triggerInputText = ""
                             }
                             if (!ok) return@Button
                         }
 
-                        if (ignoredInputText.trim().isNotEmpty()) {
+                        if (!interceptAll && ignoredInputText.trim().isNotEmpty()) {
                             val ok = tryAddKeyword(ignoredInputText, ignoredKeywordChips, keywordChips, "Ignored Keywords", "Trigger Keywords", context) {
                                 ignoredInputText = ""
                             }
                             if (!ok) return@Button
                         }
 
-                        if (keywordChips.isEmpty()) {
+                        if (!interceptAll && keywordChips.isEmpty()) {
                             android.widget.Toast.makeText(context, "Please add at least one trigger keyword", android.widget.Toast.LENGTH_SHORT).show()
                             return@Button
                         }
@@ -353,8 +358,8 @@ fun EditRuleScreen(
                         val isExactDuplicate = existingRules.any { 
                             it.id != rule?.id &&
                             it.targetPackage == targetPackage &&
-                            it.keyword == keywordChips.joinToString("|||") &&
-                            it.ignoredKeywords == ignoredKeywordChips.joinToString("|||") &&
+                            it.keyword == effectiveKeywordChips.joinToString("|||") &&
+                            it.ignoredKeywords == effectiveIgnoredKeywordChips.joinToString("|||") &&
                             it.activeDays == activeDays &&
                             it.startTimeMinute == startTimeMinute &&
                             it.endTimeMinute == endTimeMinute &&
@@ -427,34 +432,51 @@ fun EditRuleScreen(
             
             Spacer(Modifier.height(24.dp))
 
-            KeywordChipInputGroup(
-                title = "Trigger Keywords",
-                placeholder = "Type keyword & tap +",
-                textInput = triggerInputText,
-                onTextInputChange = { triggerInputText = it },
-                keywords = keywordChips,
-                otherKeywords = ignoredKeywordChips,
-                otherTitle = "Ignored Keywords",
-                darkSurface = darkSurface,
-                accentColor = accentColor,
-                textColor = textColor
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { interceptAll = !interceptAll }.padding(vertical = 8.dp)) {
+                Switch(
+                    checked = interceptAll,
+                    onCheckedChange = { interceptAll = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = accentColor, uncheckedThumbColor = Color.Gray, uncheckedTrackColor = darkSurface)
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text("Intercept all notifications", fontFamily = HostGrotesk, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                    Text("Matches every notification from the target app; trigger and ignored keywords are not needed.", fontFamily = HostGrotesk, color = textColor, fontSize = 12.sp)
+                }
+            }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
-            KeywordChipInputGroup(
-                title = "Ignored Keywords",
-                placeholder = "Type keyword & tap +",
-                helperText = "Notifications containing these words will be skipped even if they match trigger keywords.",
-                textInput = ignoredInputText,
-                onTextInputChange = { ignoredInputText = it },
-                keywords = ignoredKeywordChips,
-                otherKeywords = keywordChips,
-                otherTitle = "Trigger Keywords",
-                darkSurface = darkSurface,
-                accentColor = accentColor,
-                textColor = textColor
-            )
+            if (!interceptAll) {
+                KeywordChipInputGroup(
+                    title = "Trigger Keywords",
+                    placeholder = "Type keyword & tap +",
+                    textInput = triggerInputText,
+                    onTextInputChange = { triggerInputText = it },
+                    keywords = keywordChips,
+                    otherKeywords = ignoredKeywordChips,
+                    otherTitle = "Ignored Keywords",
+                    darkSurface = darkSurface,
+                    accentColor = accentColor,
+                    textColor = textColor
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                KeywordChipInputGroup(
+                    title = "Ignored Keywords",
+                    placeholder = "Type keyword & tap +",
+                    helperText = "Notifications containing these words will be skipped even if they match trigger keywords.",
+                    textInput = ignoredInputText,
+                    onTextInputChange = { ignoredInputText = it },
+                    keywords = ignoredKeywordChips,
+                    otherKeywords = keywordChips,
+                    otherTitle = "Trigger Keywords",
+                    darkSurface = darkSurface,
+                    accentColor = accentColor,
+                    textColor = textColor
+                )
+            }
 
             Spacer(Modifier.height(24.dp))
 
