@@ -69,7 +69,7 @@ Shown when required permissions are missing. Blocks access to the main app until
 - **Top App Bar**: Brand text on left. Diagnostics (`ecg_heart`) and Settings (`gear`) icons on right.
 - **Tab Navigation**: Full-width `TabRow` with "Active (N)" and "Inactive (N)" tabs. Selected tab uses primary accent color.
 - **Rule Cards**:
-  - Display: App icon, app name, package name, rule name, trigger keywords (displayed as oblong chip pills, max 4 + "+N more" overflow pill), active days (M/T/W/Th/F/S/Su circles), status indicators.
+  - Display: App icon, app name, package name, rule name, "Protected" badge (oblong pill when `protectNotification` is enabled), trigger keywords (displayed as oblong chip pills, max 4 + "+N more" overflow pill), active days (M/T/W/Th/F/S/Su circles), status indicators.
   - Active rules: Bright accent background with dark text.
   - Inactive rules: Dark surface (`#444444`) background with light text.
   - Tap to navigate to EditRuleScreen.
@@ -87,9 +87,12 @@ Shown when required permissions are missing. Blocks access to the main app until
   4. **Target Application** — Card-style selector showing app icon, name, and package. Tapping opens full-screen dialog with search bar and scrollable app list. "ALL APPLICATIONS" option at top.
   5. **Active Days** — Row of 7 circular toggles (M, T, W, Th, F, S, Su). Active: `#D9FF0B` with black text. Inactive: `#5B5B5B` with white text. Minimum 1 day must remain selected.
   6. **Custom Schedule Per Day** — Checkbox to enable per-day time windows. When disabled: single global Start/End time picker. When enabled: per-day rows with individual start/end time buttons.
-  7. **Remind When Schedule Starts/Ends** — Checkbox option.
-  8. **Mute Notifications Outside Schedule** — Checkbox option. Silently deletes notifications from the target app outside the active window.
-  9. **Vibration Only Mode** — Switch toggle. Disables audio alarm.
+  7. **Ring Alarm** — Switch toggle. Enables audio/vibration alarm when rule matches.
+  8. **Protect Notification** — Switch toggle ("Protect notification (stays until you acknowledge)"). Posts an un-swipeable notification copy that remains until acknowledged.
+  9. **Remind When Schedule Starts/Ends** — Checkbox option.
+  10. **Mute Notifications Outside Schedule** — Checkbox option. Silently deletes notifications from the target app outside the active window.
+  11. **Vibration Only Mode** — Switch toggle. Disables audio alarm.
+- **Guardrail**: Saving is blocked with a validation message if Ring Alarm, Protect Notification, and Mute Notifications Outside Schedule are all disabled (the rule would do nothing).
 - **Bottom Bar**: "Cancel" text button + "Save Rule" filled button (`#D9FF0B`).
 - **Unsaved Changes Dialog**: Warns before navigating away with unsaved edits. "Keep Editing" (accent) / "Discard" (red) buttons.
 - **Delete Confirmation Dialog**: "Delete Rule?" with warning text. "Cancel" (accent) / "Delete" (red) buttons.

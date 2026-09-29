@@ -24,7 +24,7 @@ The application strictly adheres to **Clean Architecture** combined with **MVVM*
 Pure Kotlin modules containing core business logic. No Android framework dependencies.
 
 - **Models**:
-  - `AlarmRule` — Complete rule definition with 15 fields including schedule, keywords, ignored keywords, mute mode, and custom time windows per day.
+  - `AlarmRule` — Complete rule definition with 17 fields including schedule, keywords, ignored keywords, mute mode, ring alarm flag, protect notification flag, and custom time windows per day.
   - `TimeWindow` — Per-day custom start/end time (minute-of-day).
 
 - **Use Cases**:
@@ -43,22 +43,25 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 - **Managers**:
   - `ScheduleManager` — Evaluates all rules to determine if interception should be active. Schedules `AlarmManager` exact alarms for the next schedule state transition. Returns `true` if any rule is currently active OR any rule has `muteOutsideSchedule` enabled.
   - `ScheduleReminderManager` — Schedules start/end reminder notifications for rules with `remindSchedule` enabled. Uses per-rule request codes derived from rule ID hash. Falls back to inexact alarms when `canScheduleExactAlarms()` is false. Tracks each armed reminder's expected trigger time via `ReminderStateStore` and exposes `rescheduleAll(context, rules)`, which detects reminders that silently failed to fire (logged as `MISSED`) before re-arming every rule. All reminder lifecycle events (`Armed`/`Fired`/`FAILED`/`DROPPED`/`MISSED`) are written to the system log via `ReminderDiagnostics`, prefixed `[Reminder]`.
+  - `ProtectedNoticeManager` — Manages posting, acknowledging, and restoring persistent protected notifications. Posts un-swipeable ongoing notifications on `IMPORTANCE_DEFAULT` channel with no sound/vibration, with an "Acknowledge" action button and a repost delete intent to prevent swiping away.
 
 ### 3. Data & Framework Layer
 
 - **Data Persistence**:
   - `RulesDataStore` — Preferences DataStore with manual JSON serialization/deserialization of `AlarmRule` list. Supports atomic read-modify-write operations. All fields are backward-compatible using `optString`/`optBoolean`/`optInt` for graceful migration.
   - `RuleRepositoryImpl` — Thin wrapper exposing DataStore as `RuleRepository` interface.
+  - `ProtectedNoticeRepository` — Preferences DataStore (`protected_notices_prefs`) storing up to 40 protected notifications. Caps storage by dropping oldest entries and logging eviction.
 
 - **Services**:
-  - `InterceptorService` (NotificationListenerService) — Intercepts all incoming notifications. Checks `EngineState.shouldIntercept()` before processing. Evaluates via `EvaluateNotificationUseCase`. Handles alarm triggering and notification muting.
+  - `InterceptorService` (NotificationListenerService) — Intercepts all incoming notifications. Checks `EngineState.shouldIntercept()` before processing. Evaluates via `EvaluateNotificationUseCase`. Posts protected copies when `protectNotification` is enabled, and triggers hardware alarms when `ringAlarm` is enabled and no alarm is already running.
   - `ActiveAlarmService` (Foreground Service) — Plays alarm sound and/or vibration pattern. Runs as `FOREGROUND_SERVICE_MEDIA_PLAYBACK`. Displays full-screen notification that launches `AlarmActivity`.
   - `EngineForegroundService` — Optional persistent notification showing "NotiVib Active" status. Uses `FOREGROUND_SERVICE_TYPE_SPECIAL_USE`.
 
 - **Receivers**:
   - `ScheduleReceiver` — Triggered by `AlarmManager` or manual broadcast. Re-evaluates all rules via `ScheduleManager`, updates `EngineState`, starts/stops `EngineForegroundService`, and calls `ScheduleReminderManager.rescheduleAll` to re-arm all reminder alarms. Uses `goAsync()` so the work can finish even if the process is about to be killed, and catches all `Throwable`s so it can never crash.
   - `ScheduleReminderReceiver` — Handles start/end schedule reminder notifications with follow-up rescheduling. Uses `goAsync()`; clears the fired reminder's expected-time marker and re-arms the next occurrence before finishing.
-  - `BootReceiver` — Re-arms schedule + reminder alarms on `BOOT_COMPLETED`/`LOCKED_BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` (app update), `TIMEZONE_CHANGED`, and `TIME_SET`, by rebroadcasting to `ScheduleReceiver`. This runs regardless of `EngineState.isGloballyEnabled` so reminders keep working even when the engine itself is off.
+  - `ProtectedNoticeReceiver` — Handles `ACTION_ACK` (acknowledges and dismisses protected notification, removing it from `ProtectedNoticeRepository`) and `ACTION_REPOST` (re-posts protected notice if still present in repository).
+  - `BootReceiver` — Re-arms schedule + reminder alarms on `BOOT_COMPLETED`/`LOCKED_BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` (app update), `TIMEZONE_CHANGED`, and `TIME_SET`, by rebroadcasting to `ScheduleReceiver`. Also restores all active protected notifications via `ProtectedNoticeManager.restoreAll` on boot and app update, regardless of `EngineState.isGloballyEnabled`.
 
 - **Reminder re-arming triggers**: reminders are (re)armed whenever a rule is saved, whenever a reminder fires (chaining to the next occurrence), on every `ScheduleReceiver` sweep (boot, app update, timezone/time change, and the periodic schedule-transition alarm), and every time `MainActivity.onResume()` runs (idempotent — alarms use `FLAG_UPDATE_CURRENT` with fixed request codes). This removes the single points of failure that previously let the reminder chain die permanently.
 
@@ -72,6 +75,14 @@ Pure Kotlin modules containing core business logic. No Android framework depende
 - **Dependency Injection**: Hilt (`@AndroidEntryPoint`, `@HiltViewModel`, `@Module`/`@InstallIn`). `ReminderDiagnostics` exposes a Hilt `@EntryPoint` so plain objects/services that aren't constructor-injected (`ScheduleReminderManager`, `ScheduleManager`, `ActiveAlarmService`) can still resolve `NotificationLogRepository` from an application `Context`.
 
 - **Engine Restart**: `EngineRestarter.restart(context)` is the single code path for "Restart Engine", used by both the Restart Engine button in `RulesListScreen` and `EngineForegroundService`'s notification action. It toggles the `InterceptorService` component (disable/enable) to force a rebind, calls `NotificationListenerService.requestRebind`, rebroadcasts to `ScheduleReceiver` to re-arm schedule/reminder alarms, and logs `[Engine Diagnostic] Engine restarted by user` followed ~3s later by the resulting listener-connected state.
+
+- **Protected Notifications Diagnostics**: All protected notification lifecycle events are written to the system log via `ReminderDiagnostics` with the `[Protect]` prefix:
+  - `Posted` / `Updated` — Logged when an incoming notification matches a rule with `protectNotification` enabled.
+  - `Acknowledged` — Logged when user taps the Acknowledge button on the protected notification copy.
+  - `Re-posted after swipe` — Logged when the system delete intent triggers and re-posts the protected notification.
+  - `Restored N after reboot` — Logged when `BootReceiver` restores persisted protected notices on device boot or app update.
+  - `Evicted oldest (cap reached)` — Logged when `ProtectedNoticeRepository` exceeds 40 entries and evicts the oldest notice.
+  - `FAILED ...` — Logged when notification posting (`POST_NOTIFICATIONS` denied), receiver handling, or restore encounters an exception.
 
 ## System Requirements & Permissions
 - `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE` — Read incoming notifications
