@@ -212,12 +212,14 @@ fun RulesListScreen(
     viewModel: RulesListViewModel = hiltViewModel(),
     onNavigateToLogs: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToEditRule: (AlarmRule?) -> Unit = {}
+    onNavigateToEditRule: (AlarmRule?) -> Unit = {},
+    onNavigateToProtectedNotices: () -> Unit = {}
 ) {
     val rules by viewModel.rules.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val systemLogs by viewModel.systemLogs.collectAsState()
     val connectionLogs by viewModel.connectionLogs.collectAsState()
+    val protectedNotices by viewModel.protectedNotices.collectAsState()
     var selectedTabIndex by remember { mutableStateOf(0) }
     val activeRules = rules.filter { it.isActive }
     val inactiveRules = rules.filter { !it.isActive }
@@ -323,6 +325,22 @@ fun RulesListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
+                    if (protectedNotices.isNotEmpty()) {
+                        BadgedBox(
+                            badge = {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.background
+                                ) {
+                                    Text("${protectedNotices.size}", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        ) {
+                            IconButton(onClick = onNavigateToProtectedNotices) {
+                                Icon(Icons.Outlined.Shield, contentDescription = "Protected Messages", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                     IconButton(onClick = { showSystemLogsDialog = true }) {
                         Icon(com.example.notivib.presentation.theme.icons.ecg_heart, contentDescription = "Engine Diagnostics", tint = Color.White)
                     }
@@ -435,6 +453,57 @@ fun RulesListScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            if (protectedNotices.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clickable { onNavigateToProtectedNotices() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF262C18),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                Icons.Outlined.Shield,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "${protectedNotices.size} Protected ${if (protectedNotices.size == 1) "Message" else "Messages"} Pending",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Review",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowForward,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // Custom Segmented Control matching UI/UX design mockup
             Row(
                 modifier = Modifier
