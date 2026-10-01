@@ -22,6 +22,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.example.notivib.domain.manager.ProtectedNoticeManager
+import com.example.notivib.domain.repository.ProtectedNotice
+import com.example.notivib.domain.repository.ProtectedNoticeRepository
 import javax.inject.Inject
 
 @HiltViewModel
@@ -32,6 +35,7 @@ class RulesListViewModel @Inject constructor(
     private val exportRulesUseCase: ExportRulesUseCase,
     private val importRulesUseCase: ImportRulesUseCase,
     private val notificationLogRepository: NotificationLogRepository,
+    private val protectedNoticeRepository: ProtectedNoticeRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     
@@ -53,6 +57,24 @@ class RulesListViewModel @Inject constructor(
     val logs: StateFlow<List<NotificationLog>> = notificationLogRepository.logs
     val systemLogs: StateFlow<List<String>> = notificationLogRepository.systemLogs
     val connectionLogs: StateFlow<List<String>> = notificationLogRepository.connectionLogs
+
+    val protectedNotices: StateFlow<List<ProtectedNotice>> = protectedNoticeRepository.notices.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    fun dismissProtectedNotice(key: String) {
+        viewModelScope.launch {
+            ProtectedNoticeManager.acknowledgeSingle(context, key)
+        }
+    }
+
+    fun acknowledgeAllProtectedNotices() {
+        viewModelScope.launch {
+            ProtectedNoticeManager.acknowledgeAll(context)
+        }
+    }
 
     fun saveRule(
         id: String?, 

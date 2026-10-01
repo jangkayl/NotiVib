@@ -5,14 +5,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.Drawable
 import android.os.Build
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.graphics.drawable.toBitmap
 import com.example.notivib.MainActivity
-import com.example.notivib.R
 import com.example.notivib.domain.repository.ProtectedNotice
 import com.example.notivib.domain.repository.ProtectedNoticeRepository
 import com.example.notivib.framework.receiver.ProtectedNoticeReceiver
@@ -26,14 +22,12 @@ object ProtectedNoticeManager {
 
     private const val CHANNEL_ID = "protected_notice_channel"
 
-    // Fixed id for the single grouped summary notification. Kept clear of
+    // Fixed id for the single summary notification. Kept clear of
     // ActiveAlarmService (1001) and EngineForegroundService (2).
     private const val SUMMARY_ID = 3
 
     private const val ACK_ALL_REQUEST_CODE = -1
     private const val REPOST_REQUEST_CODE = -2
-
-    private const val MAX_ROWS = 5
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -66,14 +60,13 @@ object ProtectedNoticeManager {
     }
 
     /**
-     * Builds and posts (or cancels) the single grouped protected-notifications summary from the
-     * current list of pending [notices]. Also cancels any legacy per-conversation ongoing
-     * notifications (keyed by [ProtectedNotice.notifId]) left over from the previous per-notice
-     * version, so upgrading users don't end up with duplicates.
+     * Builds and posts (or cancels) the single protected-notifications status notification from the
+     * current list of pending [notices]. Tapping it opens the in-app Protected Messages screen.
+     * Also cancels any legacy per-conversation ongoing notifications left over from earlier versions.
      */
     fun refresh(context: Context, notices: List<ProtectedNotice>) {
         try {
-            // Cleanup: clear any old per-conversation notifications from the previous version.
+            // Cleanup: clear any old per-conversation notifications from earlier versions.
             notices.forEach { notice ->
                 NotificationManagerCompat.from(context).cancel(notice.notifId)
             }
@@ -85,38 +78,74 @@ object ProtectedNoticeManager {
 
             ensureChannelCreated(context)
 
-            val collapsedView = RemoteViews(context.packageName, R.layout.notification_protected_collapsed)
-            val expandedView = RemoteViews(context.packageName, R.layout.notification_protected_expanded)
-
-            val headerText = "Protected Notifications (${notices.size})"
-            collapsedView.setTextViewText(R.id.header_text, headerText)
-            expandedView.setTextViewText(R.id.header_text, headerText)
-
-            bindRow(context, collapsedView, notices[0], rowContainerId = R.id.row1, iconId = R.id.row1_icon, textId = R.id.row1_text)
-
-            val rowIds = listOf(
-                RowIds(R.id.row1, R.id.row1_icon, R.id.row1_text),
-                RowIds(R.id.row2, R.id.row2_icon, R.id.row2_text),
-                RowIds(R.id.row3, R.id.row3_icon, R.id.row3_text),
-                RowIds(R.id.row4, R.id.row4_icon, R.id.row4_text),
-                RowIds(R.id.row5, R.id.row5_icon, R.id.row5_text)
-            )
-            rowIds.forEachIndexed { index, ids ->
-                if (index < notices.size && index < MAX_ROWS) {
-                    expandedView.setViewVisibility(ids.container, android.view.View.VISIBLE)
-                    bindRow(context, expandedView, notices[index], ids.container, ids.icon, ids.text)
-                } else {
-                    expandedView.setViewVisibility(ids.container, android.view.View.GONE)
-                }
-            }
-
-            val remaining = notices.size - MAX_ROWS
-            if (remaining > 0) {
-                expandedView.setTextViewText(R.id.more_text, "+ $remaining more")
-                expandedView.setViewVisibility(R.id.more_text, android.view.View.VISIBLE)
+            val count = notices.size
+            val latest = notices[0]
+            val title = "Protected Notifications ($count)"
+            val latestSnippet = if (latest.title.isNotEmpty() && latest.title != "No Title") {
+                latest.title
             } else {
-                expandedView.setViewVisibility(R.id.more_text, android.view.View.GONE)
+                latest.text
             }
+            val contentText = if (count == 1) {
+                "${latest.appName}: $latestSnippet"
+            } else {
+                "$count pending • Latest from ${latest.appName}: $latestSnippet"
+            }
+
+            val inboxStyle = NotificationCompat.InboxStyle()
+                .setBigContentTitle(title)
+
+            val maxLines = 5
+            val displayNotices = notices.take(maxLines)
+            displayNotices.forEach { notice ->
+                val appPrefix = notice.appName
+                val rawTitle = if (notice.title.isNotEmpty() && notice.title != "No Title") {
+                    notice.title.replace("\n", " ").trim()
+                } else ""
+                val rawBody = notice.text.replace("\n", " ").trim()
+
+                val cleanBody = if (rawTitle.isNotEmpty() && rawBody.startsWith(rawTitle, ignoreCase = true)) {
+                    rawBody.substring(rawTitle.length).trim().removePrefix(":").trim().removePrefix("-").trim()
+                } else {
+                    rawBody
+                }
+
+                val lineContent = when {
+                    rawTitle.isNotEmpty() && cleanBody.isNotEmpty() && !rawTitle.equals(cleanBody, ignoreCase = true) -> {
+                        "$rawTitle · $cleanBody"
+                    }
+                    rawTitle.isNotEmpty() -> rawTitle
+                    else -> cleanBody
+                }
+
+                val html = "<b>$appPrefix:</b> $lineContent"
+                val styledLine = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.text.Html.fromHtml(html)
+                }
+                inboxStyle.addLine(styledLine)
+            }
+
+            val remaining = count - displayNotices.size
+            if (remaining > 0) {
+                inboxStyle.setSummaryText("+$remaining more • Tap to view all")
+            } else {
+                inboxStyle.setSummaryText("$count protected")
+            }
+
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                putExtra(MainActivity.EXTRA_DESTINATION, MainActivity.DESTINATION_PROTECTED_NOTICES)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val contentPendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                openAppIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
 
             val ackAllIntent = Intent(context, ProtectedNoticeReceiver::class.java).apply {
                 action = ProtectedNoticeReceiver.ACTION_ACK_ALL
@@ -139,11 +168,12 @@ object ProtectedNoticeManager {
             )
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info) // Fallback icon; a coloured PNG renders as a white block
-                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-                .setCustomContentView(collapsedView)
-                .setCustomBigContentView(expandedView)
-                .setWhen(notices[0].timeMillis)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(contentText)
+                .setStyle(inboxStyle)
+                .setContentIntent(contentPendingIntent)
+                .setWhen(latest.timeMillis)
                 .setShowWhen(true)
                 .setOngoing(true)
                 .setAutoCancel(false)
@@ -160,43 +190,15 @@ object ProtectedNoticeManager {
         }
     }
 
-    private data class RowIds(val container: Int, val icon: Int, val text: Int)
-
-    private fun bindRow(
-        context: Context,
-        views: RemoteViews,
-        notice: ProtectedNotice,
-        rowContainerId: Int,
-        iconId: Int,
-        textId: Int
-    ) {
-        views.setTextViewText(textId, "${notice.title}: ${notice.text}")
-
-        val icon: Drawable? = try {
-            context.packageManager.getApplicationIcon(notice.packageName)
-        } catch (e: Exception) {
-            null
-        }
+    suspend fun acknowledgeSingle(context: Context, key: String) {
         try {
-            val bitmap = (icon ?: context.getDrawable(R.drawable.notivib_new_logo))?.toBitmap(width = 96, height = 96)
-            if (bitmap != null) {
-                views.setImageViewBitmap(iconId, bitmap)
-            }
+            val repository = getRepository(context)
+            val updated = repository.remove(key)
+            refresh(context, updated)
+            ReminderDiagnostics.log(context, "[Protect] Acknowledged notice")
         } catch (e: Exception) {
-            // Leave the icon view as-is if even the fallback drawable can't be rendered.
+            ReminderDiagnostics.log(context, "[Protect] FAILED: ${e.message}")
         }
-
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(notice.packageName)
-        val contentIntent = launchIntent ?: Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val contentPendingIntent = PendingIntent.getActivity(
-            context,
-            notice.notifId,
-            contentIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        views.setOnClickPendingIntent(rowContainerId, contentPendingIntent)
     }
 
     suspend fun acknowledgeAll(context: Context) {

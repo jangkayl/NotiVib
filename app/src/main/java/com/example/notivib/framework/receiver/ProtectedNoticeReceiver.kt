@@ -28,6 +28,12 @@ class ProtectedNoticeReceiver : BroadcastReceiver() {
                     ACTION_ACK_ALL -> {
                         ProtectedNoticeManager.acknowledgeAll(context)
                     }
+                    ACTION_ACK_SINGLE -> {
+                        val key = intent.getStringExtra(EXTRA_KEY)
+                        if (key != null) {
+                            ProtectedNoticeManager.acknowledgeSingle(context, key)
+                        }
+                    }
                     ACTION_REPOST -> {
                         val notices = repository.getAll()
                         ProtectedNoticeManager.refresh(context, notices)
@@ -46,6 +52,8 @@ class ProtectedNoticeReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_ACK_ALL = "com.example.notivib.action.PROTECTED_NOTICE_ACK_ALL"
+        const val ACTION_ACK_SINGLE = "com.example.notivib.action.PROTECTED_NOTICE_ACK_SINGLE"
         const val ACTION_REPOST = "com.example.notivib.action.PROTECTED_NOTICE_REPOST"
+        const val EXTRA_KEY = "extra_key"
     }
 }

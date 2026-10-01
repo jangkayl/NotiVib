@@ -49,11 +49,15 @@ import com.example.notivib.presentation.theme.icons.mobile_sound
 import com.example.notivib.presentation.theme.icons.face
 import com.example.notivib.presentation.theme.icons.arrow_forward_ios
 
+import com.example.notivib.MainActivity
+import com.example.notivib.presentation.rules_list.ProtectedNoticesScreen
+
 enum class Destination {
     RulesList,
     Logs,
     Settings,
-    EditRule
+    EditRule,
+    ProtectedNotices
 }
 
 fun checkNotificationAccess(context: Context): Boolean {
@@ -67,7 +71,10 @@ fun checkNotificationAccess(context: Context): Boolean {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    navTarget: String? = null,
+    onClearNavTarget: () -> Unit = {}
+) {
     val context = LocalContext.current
     var hasNotificationAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
     var hasPostNotificationPermission by remember { 
@@ -96,6 +103,14 @@ fun AppNavigation() {
     if (hasNotificationAccess && hasPostNotificationPermission) {
         var currentDestination by remember { mutableStateOf(Destination.RulesList) }
         var editingRule: com.example.notivib.domain.model.AlarmRule? by remember { mutableStateOf(null) }
+
+        LaunchedEffect(navTarget) {
+            if (navTarget == MainActivity.DESTINATION_PROTECTED_NOTICES) {
+                currentDestination = Destination.ProtectedNotices
+                onClearNavTarget()
+            }
+        }
+
         when (currentDestination) {
             Destination.RulesList -> RulesListScreen(
                 onNavigateToLogs = { currentDestination = Destination.Logs },
@@ -103,7 +118,8 @@ fun AppNavigation() {
                 onNavigateToEditRule = { rule ->
                     editingRule = rule
                     currentDestination = Destination.EditRule
-                }
+                },
+                onNavigateToProtectedNotices = { currentDestination = Destination.ProtectedNotices }
             )
             Destination.Logs -> NotificationLogScreen(onNavigateBack = { currentDestination = Destination.RulesList })
             Destination.Settings -> com.example.notivib.presentation.settings.SettingsScreen(
@@ -112,6 +128,9 @@ fun AppNavigation() {
             )
             Destination.EditRule -> com.example.notivib.presentation.rules_list.EditRuleScreen(
                 rule = editingRule,
+                onNavigateBack = { currentDestination = Destination.RulesList }
+            )
+            Destination.ProtectedNotices -> ProtectedNoticesScreen(
                 onNavigateBack = { currentDestination = Destination.RulesList }
             )
         }
